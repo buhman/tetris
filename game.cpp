@@ -13,8 +13,12 @@
 #include <GLFW/glfw3.h>
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_FORCE_LEFT_HANDED
 #include <glm/glm.hpp>
+#include <glm/ext/matrix_projection.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/string_cast.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -33,7 +37,7 @@ static std::vector<VkImageView> swapChainImageViews;
 static VkRenderPass renderPass;
 static VkDescriptorSetLayout descriptorSetLayout;
 static VkPipelineLayout pipelineLayout;
-static VkPipeline graphicsPipeline;
+static std::vector<VkPipeline> graphicsPipeline(2);
 static std::vector<VkFramebuffer> swapChainFramebuffers;
 static uint32_t queueFamilyIndex;
 static VkBuffer vertexBuffer;
@@ -77,6 +81,11 @@ struct vertex {
   glm::vec3 color;
   glm::vec2 texCoord;
 };
+
+static size_t uniformDynamicAlignment;
+static int uniformModelInstances = 4;
+static size_t uniformBufferSize;
+static void * uboModels;
 
 /*
 0.866025 -0.5
@@ -128,6 +137,20 @@ const std::vector<vertex> vertices = {
   {{-0.866025,  0.5, -0.5}, {0.0, 1.0, 1.0}, {-0.866025,  0.5}},
   {{-0.866025, -0.5, -0.5}, {0.0, 0.0, 1.0}, {-0.866025, -0.5}},
   {{      0.0, -1.0, -0.5}, {1.0, 0.0, 1.0}, {      0.0, -1.0}},
+
+  {{ 0.866025, -0.5,  0.0}, {0.7, 0.7, 0.7}, { 0.866025, -0.5}},
+  {{ 0.866025,  0.5,  0.0}, {0.7, 0.7, 0.7}, { 0.866025,  0.5}},
+  {{      0.0,  1.0,  0.0}, {0.7, 0.7, 0.7}, {      0.0,  1.0}},
+  {{-0.866025,  0.5,  0.0}, {0.7, 0.7, 0.7}, {-0.866025,  0.5}},
+  {{-0.866025, -0.5,  0.0}, {0.7, 0.7, 0.7}, {-0.866025, -0.5}},
+  {{      0.0, -1.0,  0.0}, {0.7, 0.7, 0.7}, {      0.0, -1.0}},
+
+  {{ 0.866025, -0.5, -0.5}, {0.7, 0.7, 0.7}, { 0.866025, -0.5}},
+  {{ 0.866025,  0.5, -0.5}, {0.7, 0.7, 0.7}, { 0.866025,  0.5}},
+  {{      0.0,  1.0, -0.5}, {0.7, 0.7, 0.7}, {      0.0,  1.0}},
+  {{-0.866025,  0.5, -0.5}, {0.7, 0.7, 0.7}, {-0.866025,  0.5}},
+  {{-0.866025, -0.5, -0.5}, {0.7, 0.7, 0.7}, {-0.866025, -0.5}},
+  {{      0.0, -1.0, -0.5}, {0.7, 0.7, 0.7}, {      0.0, -1.0}},
 };
 
 const std::vector<uint16_t> indices = {
@@ -159,6 +182,14 @@ const std::vector<uint16_t> indices = {
   5, 11, 6,
   5, 6, 0,
 
+  // lines
+
+  0, 1,
+  1, 2,
+  2, 3,
+  3, 4,
+  4, 5,
+  5, 0
 };
 
 struct mvp_t {
@@ -250,8 +281,13 @@ void createInstance() {
     std::cout << *(glfwExtensions + i) << '\n';
   */
 
-  createInfo.enabledExtensionCount = glfwExtensionCount;
-  createInfo.ppEnabledExtensionNames = glfwExtensions;
+  const char *exts[] = {"VK_KHR_surface", "VK_KHR_xcb_surface"};
+  std::vector<const char*> instance_extensions;
+  instance_extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
+  //createInfo.enabledExtensionCount = static_cast<uint32_t>(instance_extensions.size());
+  createInfo.enabledExtensionCount = 2;
+  //createInfo.ppEnabledExtensionNames = instance_extensions.data();
+  createInfo.ppEnabledExtensionNames = exts;
 
   assertValidationLayers();
   createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
@@ -265,7 +301,8 @@ void createInstance() {
 }
 
 const std::vector<const char*> deviceExtensions = {
-  VK_KHR_SWAPCHAIN_EXTENSION_NAME
+  VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+  //VK_EXT_DEPTH_RANGE_UNRESTRICTED_EXTENSION_NAME
 };
 
 bool checkDeviceFeatures(VkPhysicalDevice device) {
@@ -382,6 +419,8 @@ void pickPhysicalDevice() {
 
   VkPhysicalDeviceFeatures deviceFeatures{};
   deviceFeatures.samplerAnisotropy = VK_TRUE;
+  deviceFeatures.fillModeNonSolid = VK_TRUE;
+  deviceFeatures.wideLines = VK_TRUE;
 
   VkDeviceCreateInfo createInfo{};
   createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -392,6 +431,7 @@ void pickPhysicalDevice() {
 
   createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
   createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+
 
   if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &logicalDevice) != VK_SUCCESS)
     throw std::runtime_error("failed to create logical device");
@@ -585,7 +625,7 @@ void createRenderPass() {
 void createDescriptorSetLayout() {
   VkDescriptorSetLayoutBinding mvpLayoutBinding{};
   mvpLayoutBinding.binding = 0;
-  mvpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  mvpLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
   mvpLayoutBinding.descriptorCount = 1;
   mvpLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
   mvpLayoutBinding.pImmutableSamplers = nullptr;
@@ -607,7 +647,7 @@ void createDescriptorSetLayout() {
     throw std::runtime_error("failed to create descriptor set layout!");
 }
 
-void createGraphicsPipeline() {
+void createGraphicsPipelines() {
   auto vertShaderCode = readFile("shader.vert.spv");
   VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
   VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
@@ -636,10 +676,14 @@ void createGraphicsPipeline() {
   vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
   vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
-  VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-  inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-  inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-  inputAssembly.primitiveRestartEnable = VK_FALSE;
+  std::vector<VkPipelineInputAssemblyStateCreateInfo> inputAssemblies(2);
+  inputAssemblies[0].sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+  inputAssemblies[0].topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  inputAssemblies[0].primitiveRestartEnable = VK_FALSE;
+
+  inputAssemblies[1].sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+  inputAssemblies[1].topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+  inputAssemblies[1].primitiveRestartEnable = VK_FALSE;
 
   VkViewport viewport{};
   viewport.x = 0.0f;
@@ -660,20 +704,23 @@ void createGraphicsPipeline() {
   viewportState.scissorCount = 1;
   viewportState.pScissors = &scissor;
 
-  VkPipelineRasterizationStateCreateInfo rasterizer{};
-  rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-  rasterizer.depthClampEnable = VK_FALSE;
-  rasterizer.rasterizerDiscardEnable = VK_FALSE;
-  //rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-  rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
-  rasterizer.lineWidth = 1.0f;
-  rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-  //rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-  rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-  rasterizer.depthBiasEnable = VK_FALSE;
-  rasterizer.depthBiasConstantFactor = 0.0f;
-  rasterizer.depthBiasClamp = 0.0f;
-  rasterizer.depthBiasSlopeFactor = 0.0f;
+  std::vector<VkPipelineRasterizationStateCreateInfo> rasterizers(2);
+  VkPolygonMode polygonModes[2] = {VK_POLYGON_MODE_FILL, VK_POLYGON_MODE_LINE};
+  for (size_t i = 0; i < rasterizers.size(); i++) {
+    rasterizers[i].sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizers[i].depthClampEnable = VK_FALSE;
+    rasterizers[i].rasterizerDiscardEnable = VK_FALSE;
+    rasterizers[i].polygonMode = polygonModes[i];
+    rasterizers[i].lineWidth = 2.0f;
+    rasterizers[i].cullMode = VK_CULL_MODE_NONE;
+    //rasterizers[i].cullMode = VK_CULL_MODE_FRONT_AND_BACK;
+    rasterizers[i].frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizers[i].frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizers[i].depthBiasEnable = VK_FALSE;
+    rasterizers[i].depthBiasConstantFactor = 0.0f;
+    rasterizers[i].depthBiasClamp = 0.0f;
+    rasterizers[i].depthBiasSlopeFactor = 0.0f;
+  }
 
   VkPipelineMultisampleStateCreateInfo multisampling{};
   multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -732,9 +779,8 @@ void createGraphicsPipeline() {
   pipelineInfo.stageCount = 2;
   pipelineInfo.pStages = shaderStages;
   pipelineInfo.pVertexInputState = &vertexInputInfo;
-  pipelineInfo.pInputAssemblyState = &inputAssembly;
   pipelineInfo.pViewportState = &viewportState;
-  pipelineInfo.pRasterizationState = &rasterizer;
+  pipelineInfo.pRasterizationState = &rasterizers[0];
   pipelineInfo.pMultisampleState = &multisampling;
   pipelineInfo.pDepthStencilState = &depthStencil;
   pipelineInfo.pColorBlendState = &colorBlending;
@@ -745,8 +791,11 @@ void createGraphicsPipeline() {
   pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
   pipelineInfo.basePipelineIndex = -1;
 
-  if (vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS)
-    throw std::runtime_error("failed to create graphics pipeline");
+  for (size_t i = 0; i < graphicsPipeline.size(); i++) {
+    pipelineInfo.pInputAssemblyState = &inputAssemblies[i];
+    if (vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline[i]) != VK_SUCCESS)
+      throw std::runtime_error("failed to create graphics pipeline");
+  }
 
   vkDestroyShaderModule(logicalDevice, fragShaderModule, nullptr);
   vkDestroyShaderModule(logicalDevice, vertShaderModule, nullptr);
@@ -915,13 +964,13 @@ void createIndexBuffer() {
   createBufferWithMemory(usageFlags, indexBuffer, indexBufferMemory, size, indices.data());
 }
 
-void createUniformBuffer() {
-  VkDeviceSize size = sizeof(mvp_t);
+void createUniformBuffers(VkDeviceSize size) {
 
   uniformBuffers.resize(swapChainImages.size());
   uniformBuffersMemory.resize(swapChainImages.size());
 
   for (size_t i = 0; i < swapChainImages.size(); i++) {
+
     createBuffer(size,
                  VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -930,9 +979,26 @@ void createUniformBuffer() {
   }
 }
 
+void prepareUniformBuffers() {
+  VkPhysicalDeviceProperties properties{};
+  vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+
+  size_t minUboAlignment = properties.limits.minUniformBufferOffsetAlignment;
+  uniformDynamicAlignment = sizeof(glm::mat4);
+  if (minUboAlignment > 0)
+    uniformDynamicAlignment = (uniformDynamicAlignment + minUboAlignment - 1) & ~(minUboAlignment - 1);
+  std::cout << "minUboAlignment: " << minUboAlignment << " uniformDynamicAlignment: " << uniformDynamicAlignment << '\n';
+
+  uniformBufferSize = uniformModelInstances * uniformDynamicAlignment;
+  int ret = posix_memalign(&uboModels, uniformDynamicAlignment, uniformBufferSize);
+  assert(ret == 0);
+
+  createUniformBuffers(uniformBufferSize);
+}
+
 void createDescriptorPool() {
   std::array<VkDescriptorPoolSize, 2> poolSizes{};
-  poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
   poolSizes[0].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
   poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
   poolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
@@ -964,7 +1030,7 @@ void createDescriptorSets() {
     VkDescriptorBufferInfo bufferInfo{};
     bufferInfo.buffer = uniformBuffers[i];
     bufferInfo.offset = 0;
-    bufferInfo.range = sizeof(mvp_t);
+    bufferInfo.range = sizeof(glm::mat4);
 
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -976,7 +1042,7 @@ void createDescriptorSets() {
     descriptorWrites[0].dstSet = descriptorSets[i];
     descriptorWrites[0].dstBinding = 0;
     descriptorWrites[0].dstArrayElement = 0;
-    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     descriptorWrites[0].descriptorCount = 1;
     descriptorWrites[0].pBufferInfo = &bufferInfo;
     descriptorWrites[0].pImageInfo = nullptr;
@@ -1032,22 +1098,41 @@ void createCommandBuffers() {
     renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
     renderPassInfo.pClearValues = clearValues.data();
 
+    VkBuffer vertexBuffers[] = {vertexBuffer};
+
     vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-    VkBuffer vertexBuffers[] = {vertexBuffer};
+    vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline[0]);
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
     vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
-    //vkCmdDraw(commandBuffers[i], 6, 1, 0, 0);
+    for (uint32_t j = 0; j < uniformModelInstances; j++) {
+      uint32_t dynamicOffset = j * static_cast<uint32_t>(uniformDynamicAlignment);
+
+      vkCmdBindDescriptorSets(commandBuffers[i],
+                              VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              pipelineLayout, 0, 1,
+                              &descriptorSets[i], 1, &dynamicOffset);
+
+      vkCmdDrawIndexed(commandBuffers[i], 60, 1, 0, 0, 0);
+    }
+
+    // lines
+
+    /*
+    vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline[1]);
+    VkDeviceSize offsets2[] = {sizeof(vertex) * 12};
+    vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets2);
+    vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, (sizeof(uint16_t)) * 60, VK_INDEX_TYPE_UINT16);
+
     vkCmdBindDescriptorSets(commandBuffers[i],
                             VK_PIPELINE_BIND_POINT_GRAPHICS,
                             pipelineLayout, 0, 1,
                             &descriptorSets[i], 0, nullptr);
 
-    vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+    vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()) - 60, 1, 0, 0, 0);
+    */
 
     vkCmdEndRenderPass(commandBuffers[i]);
 
@@ -1338,25 +1423,84 @@ void initVulkan() {
 }
 
 void updateUniformBuffer(uint32_t currentImage) {
+  for (int i = 0; i < uniformModelInstances; i++) {
+    glm::mat4* model = (glm::mat4*)(((uint64_t)uboModels + (i * uniformDynamicAlignment)));
+    *model = glm::mat4(1.0f);
+    *model = glm::translate(*model, glm::vec3(0.0f, (float)i * 0.2, 0.0f));
+  }
+
+  void *data;
+  vkMapMemory(logicalDevice, uniformBuffersMemory[currentImage], 0, uniformBufferSize, 0, &data);
+  memcpy(data, uboModels, uniformBufferSize);
+  vkUnmapMemory(logicalDevice, uniformBuffersMemory[currentImage]);
+}
+
+void updateUniformBufferMVP(uint32_t currentImage) {
   static auto startTime = std::chrono::high_resolution_clock::now();
   auto currentTime = std::chrono::high_resolution_clock::now();
   float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
   mvp_t mvp;
-  mvp.model = glm::rotate(glm::mat4(1.0f),
+  mvp.model = glm::mat4(1.0f);
+  //mvp.model = glm::translate(mvp.model, glm::vec3(0.0f, 0.0f, -0.25f));
+  mvp.model = glm::scale(mvp.model, glm::vec3(0.5f, 0.5f, 0.5f));
+  /*
+  mvp.model = glm::rotate(mvp.model,
                           time * glm::radians(20.0f),
-                          glm::vec3(0.0f, 0.0f, 1.0f));
+                          glm::vec3(1.0f, 1.0f, 1.0f));
+  */
+  //mvp.model = glm::scale(mvp.model, glm::vec3(0.1f, 0.1f, 0.1f));
 
+  //mvp.model = glm::translate(mvp.model, glm::vec3(0.0f, 0.0f, 0.25f));
+  //mvp.model = glm::rotate(mvp.model, -0.1f, glm::vec3(0.0f, 0.0f, 1.0f));
+  //mvp.model = glm::translate(mvp.model, glm::vec3(0.0f, -0.0f, 2.5f));
+
+  mvp.view = glm::mat4(1.0f);
+  mvp.view = glm::translate(mvp.view, glm::vec3(-0.0f, -0.0f, 2.0f));
+  //mvp.view = glm::rotate(mvp.view, -0.05f * (float)time, glm::vec3(1.0f, 0.0f, 0.0f));
+
+  /*
   mvp.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
                          glm::vec3(0.0f, 0.0f, 0.0f),
-                         glm::vec3(0.0f, 0.0f, 1.0f));
+                         glm::vec3(0.0f, 0.0f, -1.0f));
+  */
 
+  float r = (float)swapChainExtent.width;
+  float l = 0.0f;
+  float t = 0.0f;
+  float b = (float)swapChainExtent.height;
+  float ratio = r / b;
+
+  float proj[16] = {
+    1.0f / ratio, 0.0f, 0.0f, 0.0f,
+    0.0f, 1.0f, 0.0f, 0.0f,
+    0.0f, 0.0f, 1.0f, 0.0f,
+    0.0f, 0.0f, 0.0f, 1.0f,
+  };
+  mvp.proj = glm::make_mat4(proj);
+  //mvp.proj = glm::mat4(1.0f);
   mvp.proj = glm::perspective(glm::radians(45.0f),
                               swapChainExtent.width / (float) swapChainExtent.height,
                               0.1f,
                               10.0f);
+  /*
+    mvp.proj = glm::ortho(0.0f, (float)swapChainExtent.width,
+                        (float)swapChainExtent.height, 0.0f,
+                        -1000.0f, 1000.0f);
+  */
+  //mvp.proj = glm::mat4(1.0f);
 
-  mvp.proj[1][1] *= -1;
+  //std::cerr << glm::to_string(mvp.proj) << '\n';
+  /*
+mat4x4((0.002088, 0.000000, 0.000000, 0.000000),
+       (0.000000, -0.001855, 0.000000, 0.000000),
+       (0.000000, 0.000000, 0.500000, 0.000000),
+       (-1.000000, 1.000000, 0.500000, 1.000000))
+  */
+
+  //mvp.proj = glm::mat4(1.0f);
+
+  //mvp.proj[1][1] *= -1;
 
   void* data;
   vkMapMemory(logicalDevice, uniformBuffersMemory[currentImage], 0, sizeof(mvp_t), 0, &data);
@@ -1438,10 +1582,10 @@ void recreateSwapChain() {
   createImageViews();
   createRenderPass();
   createDescriptorSetLayout();
-  createGraphicsPipeline();
+  createGraphicsPipelines();
   createDepth();
   createFramebuffers();
-  createUniformBuffer();
+  prepareUniformBuffers();
   createDescriptorPool();
   createDescriptorSets();
   createCommandBuffers();
@@ -1458,7 +1602,8 @@ void cleanupSwapChain() {
 
   vkFreeCommandBuffers(logicalDevice, commandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
 
-  vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
+  vkDestroyPipeline(logicalDevice, graphicsPipeline[0], nullptr);
+  vkDestroyPipeline(logicalDevice, graphicsPipeline[1], nullptr);
   vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
   vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
 
