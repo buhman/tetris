@@ -22,6 +22,8 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#include "tetris.hpp"
+#include "game.hpp"
 
 static GLFWwindow * window;
 static VkInstance instance;
@@ -77,14 +79,20 @@ void recreateSwapChain();
 void cleanupSwapChain();
 
 struct vertex {
-  glm::vec3 pos;
-  glm::vec3 color;
-  glm::vec2 texCoord;
+  alignas(16) glm::vec3 pos;
+  alignas(16) glm::vec3 color;
+  alignas(8) glm::vec2 texCoord;
+};
+
+struct _ubo {
+  alignas(16) glm::mat4 model;
+  alignas(16) glm::vec3 color;
 };
 
 static size_t uniformDynamicAlignment;
-static int uniformModelInstances = 4;
+static int uniformModelInstances = 200;
 static size_t uniformBufferSize;
+static size_t uboInstanceSize = (sizeof (_ubo));
 static void * uboModels;
 
 /*
@@ -124,72 +132,15 @@ const std::vector<vertex> vertices = {
 
 // clockwise
 const std::vector<vertex> vertices = {
-  {{ 0.866025, -0.5,  0.0}, {1.0, 0.0, 0.0}, { 0.866025, -0.5}},
-  {{ 0.866025,  0.5,  0.0}, {1.0, 1.0, 0.0}, { 0.866025,  0.5}},
-  {{      0.0,  1.0,  0.0}, {0.0, 1.0, 0.0}, {      0.0,  1.0}},
-  {{-0.866025,  0.5,  0.0}, {0.0, 1.0, 1.0}, {-0.866025,  0.5}},
-  {{-0.866025, -0.5,  0.0}, {0.0, 0.0, 1.0}, {-0.866025, -0.5}},
-  {{      0.0, -1.0,  0.0}, {1.0, 0.0, 1.0}, {      0.0, -1.0}},
-
-  {{ 0.866025, -0.5, -0.5}, {1.0, 0.0, 0.0}, { 0.866025, -0.5}},
-  {{ 0.866025,  0.5, -0.5}, {1.0, 1.0, 0.0}, { 0.866025,  0.5}},
-  {{      0.0,  1.0, -0.5}, {0.0, 1.0, 0.0}, {      0.0,  1.0}},
-  {{-0.866025,  0.5, -0.5}, {0.0, 1.0, 1.0}, {-0.866025,  0.5}},
-  {{-0.866025, -0.5, -0.5}, {0.0, 0.0, 1.0}, {-0.866025, -0.5}},
-  {{      0.0, -1.0, -0.5}, {1.0, 0.0, 1.0}, {      0.0, -1.0}},
-
-  {{ 0.866025, -0.5,  0.0}, {0.7, 0.7, 0.7}, { 0.866025, -0.5}},
-  {{ 0.866025,  0.5,  0.0}, {0.7, 0.7, 0.7}, { 0.866025,  0.5}},
-  {{      0.0,  1.0,  0.0}, {0.7, 0.7, 0.7}, {      0.0,  1.0}},
-  {{-0.866025,  0.5,  0.0}, {0.7, 0.7, 0.7}, {-0.866025,  0.5}},
-  {{-0.866025, -0.5,  0.0}, {0.7, 0.7, 0.7}, {-0.866025, -0.5}},
-  {{      0.0, -1.0,  0.0}, {0.7, 0.7, 0.7}, {      0.0, -1.0}},
-
-  {{ 0.866025, -0.5, -0.5}, {0.7, 0.7, 0.7}, { 0.866025, -0.5}},
-  {{ 0.866025,  0.5, -0.5}, {0.7, 0.7, 0.7}, { 0.866025,  0.5}},
-  {{      0.0,  1.0, -0.5}, {0.7, 0.7, 0.7}, {      0.0,  1.0}},
-  {{-0.866025,  0.5, -0.5}, {0.7, 0.7, 0.7}, {-0.866025,  0.5}},
-  {{-0.866025, -0.5, -0.5}, {0.7, 0.7, 0.7}, {-0.866025, -0.5}},
-  {{      0.0, -1.0, -0.5}, {0.7, 0.7, 0.7}, {      0.0, -1.0}},
+  {{ -1.0f, -1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {-1.0f, -1.0f}},
+  {{  1.0f, -1.0f, 0.0f}, {1.0f, 1.0f, 0.0f}, { 1.0f, -1.0f}},
+  {{  1.0f,  1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, { 1.0f,  1.0f}},
+  {{ -1.0f,  1.0f, 0.0f}, {0.0f, 1.0f, 1.0f}, {-1.0f,  1.0f}},
 };
 
 const std::vector<uint16_t> indices = {
   0, 1, 2,
   2, 3, 0,
-  0, 3, 5,
-  5, 3, 4,
-
-  6, 7, 8,
-  8, 9, 6,
-  6, 9, 11,
-  11, 9, 10,
-
-  0, 6, 7,
-  0, 7, 1,
-
-  1, 7, 8,
-  1, 8, 2,
-
-  2, 8, 9,
-  2, 9, 3,
-
-  3, 9, 10,
-  3, 10, 4,
-
-  4, 10, 11,
-  4, 11, 5,
-
-  5, 11, 6,
-  5, 6, 0,
-
-  // lines
-
-  0, 1,
-  1, 2,
-  2, 3,
-  3, 4,
-  4, 5,
-  5, 0
 };
 
 struct mvp_t {
@@ -261,10 +212,10 @@ void createInstance() {
   VkApplicationInfo appInfo{};
   appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 
-  VkValidationFeatureEnableEXT enables[] = {VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT};
+  VkValidationFeatureEnableEXT enables[] = {VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT, VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT};
   VkValidationFeaturesEXT features = {};
   features.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
-  features.enabledValidationFeatureCount = 1;
+  features.enabledValidationFeatureCount = 2;
   features.pEnabledValidationFeatures = enables;
 
   VkInstanceCreateInfo createInfo{};
@@ -302,6 +253,7 @@ void createInstance() {
 
 const std::vector<const char*> deviceExtensions = {
   VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+  VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
   //VK_EXT_DEPTH_RANGE_UNRESTRICTED_EXTENSION_NAME
 };
 
@@ -712,10 +664,10 @@ void createGraphicsPipelines() {
     rasterizers[i].rasterizerDiscardEnable = VK_FALSE;
     rasterizers[i].polygonMode = polygonModes[i];
     rasterizers[i].lineWidth = 2.0f;
-    rasterizers[i].cullMode = VK_CULL_MODE_NONE;
-    //rasterizers[i].cullMode = VK_CULL_MODE_FRONT_AND_BACK;
+    //rasterizers[i].cullMode = VK_CULL_MODE_NONE;
+    rasterizers[i].cullMode = VK_CULL_MODE_BACK_BIT;
     rasterizers[i].frontFace = VK_FRONT_FACE_CLOCKWISE;
-    rasterizers[i].frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    //rasterizers[i].frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizers[i].depthBiasEnable = VK_FALSE;
     rasterizers[i].depthBiasConstantFactor = 0.0f;
     rasterizers[i].depthBiasClamp = 0.0f;
@@ -984,9 +936,10 @@ void prepareUniformBuffers() {
   vkGetPhysicalDeviceProperties(physicalDevice, &properties);
 
   size_t minUboAlignment = properties.limits.minUniformBufferOffsetAlignment;
-  uniformDynamicAlignment = sizeof(glm::mat4);
+  uniformDynamicAlignment = uboInstanceSize;
   if (minUboAlignment > 0)
     uniformDynamicAlignment = (uniformDynamicAlignment + minUboAlignment - 1) & ~(minUboAlignment - 1);
+  uniformDynamicAlignment = pow(2, ceil(log(uniformDynamicAlignment)/log(2)));
   std::cout << "minUboAlignment: " << minUboAlignment << " uniformDynamicAlignment: " << uniformDynamicAlignment << '\n';
 
   uniformBufferSize = uniformModelInstances * uniformDynamicAlignment;
@@ -1030,7 +983,7 @@ void createDescriptorSets() {
     VkDescriptorBufferInfo bufferInfo{};
     bufferInfo.buffer = uniformBuffers[i];
     bufferInfo.offset = 0;
-    bufferInfo.range = sizeof(glm::mat4);
+    bufferInfo.range = uboInstanceSize;
 
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1115,24 +1068,8 @@ void createCommandBuffers() {
                               pipelineLayout, 0, 1,
                               &descriptorSets[i], 1, &dynamicOffset);
 
-      vkCmdDrawIndexed(commandBuffers[i], 60, 1, 0, 0, 0);
+      vkCmdDrawIndexed(commandBuffers[i], 6, 1, 0, 0, 0);
     }
-
-    // lines
-
-    /*
-    vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline[1]);
-    VkDeviceSize offsets2[] = {sizeof(vertex) * 12};
-    vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets2);
-    vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, (sizeof(uint16_t)) * 60, VK_INDEX_TYPE_UINT16);
-
-    vkCmdBindDescriptorSets(commandBuffers[i],
-                            VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipelineLayout, 0, 1,
-                            &descriptorSets[i], 0, nullptr);
-
-    vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()) - 60, 1, 0, 0, 0);
-    */
 
     vkCmdEndRenderPass(commandBuffers[i]);
 
@@ -1423,88 +1360,23 @@ void initVulkan() {
 }
 
 void updateUniformBuffer(uint32_t currentImage) {
-  for (int i = 0; i < uniformModelInstances; i++) {
-    glm::mat4* model = (glm::mat4*)(((uint64_t)uboModels + (i * uniformDynamicAlignment)));
-    *model = glm::mat4(1.0f);
-    *model = glm::translate(*model, glm::vec3(0.0f, (float)i * 0.2, 0.0f));
+  for (int u = 0; u < 10; u++) {
+    for (int v = 0; v < 20; v++) {
+      int i = u + (10 * v);
+      assert(i < uniformModelInstances);
+
+      tetris::cell cell = tetris::board[u][v];
+
+      _ubo* ubo = (_ubo*)(((uint64_t)uboModels + (i * uniformDynamicAlignment)));
+      ubo->model = glm::translate(glm::mat4(1.0f),
+                                  glm::vec3(-0.45f + (float)u * 0.1f, -0.95f + (float)v * 0.1f, 0.0f));
+      ubo->color = cellColors[cell.color];
+    }
   }
 
   void *data;
   vkMapMemory(logicalDevice, uniformBuffersMemory[currentImage], 0, uniformBufferSize, 0, &data);
   memcpy(data, uboModels, uniformBufferSize);
-  vkUnmapMemory(logicalDevice, uniformBuffersMemory[currentImage]);
-}
-
-void updateUniformBufferMVP(uint32_t currentImage) {
-  static auto startTime = std::chrono::high_resolution_clock::now();
-  auto currentTime = std::chrono::high_resolution_clock::now();
-  float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
-  mvp_t mvp;
-  mvp.model = glm::mat4(1.0f);
-  //mvp.model = glm::translate(mvp.model, glm::vec3(0.0f, 0.0f, -0.25f));
-  mvp.model = glm::scale(mvp.model, glm::vec3(0.5f, 0.5f, 0.5f));
-  /*
-  mvp.model = glm::rotate(mvp.model,
-                          time * glm::radians(20.0f),
-                          glm::vec3(1.0f, 1.0f, 1.0f));
-  */
-  //mvp.model = glm::scale(mvp.model, glm::vec3(0.1f, 0.1f, 0.1f));
-
-  //mvp.model = glm::translate(mvp.model, glm::vec3(0.0f, 0.0f, 0.25f));
-  //mvp.model = glm::rotate(mvp.model, -0.1f, glm::vec3(0.0f, 0.0f, 1.0f));
-  //mvp.model = glm::translate(mvp.model, glm::vec3(0.0f, -0.0f, 2.5f));
-
-  mvp.view = glm::mat4(1.0f);
-  mvp.view = glm::translate(mvp.view, glm::vec3(-0.0f, -0.0f, 2.0f));
-  //mvp.view = glm::rotate(mvp.view, -0.05f * (float)time, glm::vec3(1.0f, 0.0f, 0.0f));
-
-  /*
-  mvp.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
-                         glm::vec3(0.0f, 0.0f, 0.0f),
-                         glm::vec3(0.0f, 0.0f, -1.0f));
-  */
-
-  float r = (float)swapChainExtent.width;
-  float l = 0.0f;
-  float t = 0.0f;
-  float b = (float)swapChainExtent.height;
-  float ratio = r / b;
-
-  float proj[16] = {
-    1.0f / ratio, 0.0f, 0.0f, 0.0f,
-    0.0f, 1.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 1.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, 1.0f,
-  };
-  mvp.proj = glm::make_mat4(proj);
-  //mvp.proj = glm::mat4(1.0f);
-  mvp.proj = glm::perspective(glm::radians(45.0f),
-                              swapChainExtent.width / (float) swapChainExtent.height,
-                              0.1f,
-                              10.0f);
-  /*
-    mvp.proj = glm::ortho(0.0f, (float)swapChainExtent.width,
-                        (float)swapChainExtent.height, 0.0f,
-                        -1000.0f, 1000.0f);
-  */
-  //mvp.proj = glm::mat4(1.0f);
-
-  //std::cerr << glm::to_string(mvp.proj) << '\n';
-  /*
-mat4x4((0.002088, 0.000000, 0.000000, 0.000000),
-       (0.000000, -0.001855, 0.000000, 0.000000),
-       (0.000000, 0.000000, 0.500000, 0.000000),
-       (-1.000000, 1.000000, 0.500000, 1.000000))
-  */
-
-  //mvp.proj = glm::mat4(1.0f);
-
-  //mvp.proj[1][1] *= -1;
-
-  void* data;
-  vkMapMemory(logicalDevice, uniformBuffersMemory[currentImage], 0, sizeof(mvp_t), 0, &data);
-  memcpy(data, &mvp, sizeof(mvp_t));
   vkUnmapMemory(logicalDevice, uniformBuffersMemory[currentImage]);
 }
 
@@ -1654,6 +1526,8 @@ void cleanup() {
 }
 
 int main() {
+  tetris::initBoard();
+
   initWindow();
   initVulkan();
   loop();
