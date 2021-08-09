@@ -8,9 +8,13 @@
 #include <stdexcept>
 #include <vector>
 
+#include "platform.hpp"
+
 #include <vulkan/vulkan.h>
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
+
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_FORCE_LEFT_HANDED
@@ -20,7 +24,6 @@
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include "tetris.hpp"
 #include "game.hpp"
@@ -207,7 +210,7 @@ void initWindow() {
   glfwSetKeyCallback(window, keyCallback);
 }
 
-void assertValidationLayers() {
+bool assertValidationLayers() {
   uint32_t layerCount;
   vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
@@ -220,48 +223,57 @@ void assertValidationLayers() {
         goto next_layer;
       }
     }
-    throw std::runtime_error("validation layers not available");
+    return false;
 
   next_layer:
     continue;
   }
+  return true;
 }
 
 void createInstance() {
+  uint32_t extensionCount = 0;
+  vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+  std::vector<VkExtensionProperties> extensions(extensionCount);
+  vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+  std::cerr << "available instance extensions:\n";
+  for (const auto& extension : extensions)
+    std::cerr << '\t' << extension.extensionName << '\n';
+
   VkApplicationInfo appInfo{};
   appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 
-  VkValidationFeatureEnableEXT enables[] = {VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT, VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT};
+  std::array<VkValidationFeatureEnableEXT, 1> enables = {VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT};
   VkValidationFeaturesEXT features = {};
   features.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
-  features.enabledValidationFeatureCount = 2;
-  features.pEnabledValidationFeatures = enables;
+  features.enabledValidationFeatureCount = enables.size();
+  features.pEnabledValidationFeatures = enables.data();
 
   VkInstanceCreateInfo createInfo{};
   createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   createInfo.pApplicationInfo = &appInfo;
-  createInfo.pNext = &features;
 
-  uint32_t glfwExtensionCount = 0;
-  const char** glfwExtensions;
+  std::array<const char*, 2> instanceExtensions{};
+  instanceExtensions[0] = "VK_KHR_surface";
+  #if defined _WIN32
+  instanceExtensions[1] = "VK_KHR_win32_surface";
+  #elif defined __linux__
+  instanceExtensions[1] = "VK_KHR_xlib_surface";
+  #endif
 
-  glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-  /*
-  for (uint32_t i = 0; i < glfwExtensionCount; i++)
-    std::cout << *(glfwExtensions + i) << '\n';
-  */
+  std::cerr << "requested instance extensions:\n";
+  for (const auto& extension : instanceExtensions)
+    std::cerr << '\t' << extension << '\n';
 
-  const char *exts[] = {"VK_KHR_surface", "VK_KHR_xcb_surface"};
-  std::vector<const char*> instance_extensions;
-  instance_extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
-  //createInfo.enabledExtensionCount = static_cast<uint32_t>(instance_extensions.size());
-  createInfo.enabledExtensionCount = 2;
-  //createInfo.ppEnabledExtensionNames = instance_extensions.data();
-  createInfo.ppEnabledExtensionNames = exts;
+  createInfo.enabledExtensionCount = instanceExtensions.size();
+  createInfo.ppEnabledExtensionNames = instanceExtensions.data();
 
-  assertValidationLayers();
-  createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-  createInfo.ppEnabledLayerNames = validationLayers.data();
+  if (assertValidationLayers()) {
+    std::cerr << "requested validation layers\n";
+    createInfo.pNext = &features;
+    createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+    createInfo.ppEnabledLayerNames = validationLayers.data();
+  }
 
   VkResult result = vkCreateInstance(&createInfo, nullptr, &instance);
 
@@ -272,7 +284,7 @@ void createInstance() {
 
 const std::vector<const char*> deviceExtensions = {
   VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-  VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
+  //VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
   //VK_EXT_DEPTH_RANGE_UNRESTRICTED_EXTENSION_NAME
 };
 
@@ -341,8 +353,27 @@ void findPresentModes(VkPhysicalDevice device,
 }
 
 void createSurface() {
-  if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
-    throw std::runtime_error("failed to create window surface");
+
+#if defined _WIN32
+  VkWin32SurfaceCreateInfoKHR createInfo{};
+  createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+  createInfo.hwnd = glfwGetWin32Window(window);
+  createInfo.hinstance = GetModuleHandle(nullptr);
+
+  if (vkCreateWin32SurfaceKHR(instance, &createInfo, nullptr, &surface) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create window surface!");
+  }
+#elif defined __linux__
+  VkXlibSurfaceCreateInfoKHR createInfo{};
+  createInfo.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
+  createInfo.dpy = glfwGetX11Display();
+  createInfo.window = glfwGetX11Window(window);
+
+
+  if (vkCreateXlibSurfaceKHR(instance, &createInfo, nullptr, &surface) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create window surface!");
+  }
+#endif
 }
 
 void pickPhysicalDevice() {
