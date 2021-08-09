@@ -1,4 +1,9 @@
+#include <algorithm>
+#include <chrono>
 #include <iostream>
+#include <queue>
+#include <random>
+#include <set>
 
 #include "tetris.hpp"
 
@@ -38,12 +43,59 @@ coord tetris::offsets[TET_LAST][4][4] = {
 };
 
 tetronimo tetris::piece = {
-  .type = TET_I,
   .pos = {0, 0},
   .facing = DIR_0,
 };
 
+std::set<tetris::type> bag;
+std::vector<tetris::type> tetris::queue;
+tetris::type tetris::swap = TET_O;
+
+static auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+std::default_random_engine generator (seed);
+
+void refill_bag() {
+  if (bag.size() == 0) {
+    std::cerr << "refill" << '\n';
+    std::set<tetris::type>::iterator it = bag.end();
+    for (int i = 0; i != TET_LAST; i++) {
+      tetris::type t = static_cast<tetris::type>(i);
+      bag.insert(it, t);
+    }
+  }
+}
+
+tetris::type next_type() {
+  while (queue.size() < 6) {
+    refill_bag();
+    std::uniform_int_distribution<int> distribution(0, bag.size() - 1);
+    int n = distribution(generator);
+    std::set<tetris::type>::iterator it = bag.begin();
+    std::advance(it, n);
+    queue.insert(queue.begin(), *it);
+    bag.erase(it);
+  }
+
+  /*
+  std::vector<tetris::type>::iterator it;
+  for (it = queue.begin(); it != queue.end(); it++)
+    std::cerr << ' ' << *it << '\n';
+  */
+
+  tetris::type next = queue.back();
+  queue.pop_back();
+  return next;
+}
+
+void next_piece() {
+  piece.type = next_type();
+  piece.pos.u = 0;
+  piece.pos.v = 0;
+}
+
 void tetris::initBoard() {
+  next_piece();
+
   for (int u = 0; u < 10; u++) {
     for (int v = 0; v < 20; v++) {
       board[u][v].empty = true;
@@ -135,9 +187,7 @@ void drop() {
   if (collision(p)) {
     place();
     clearLines();
-    piece.type = static_cast<type>(((int)piece.type + 1) % ((int)TET_LAST));
-    piece.pos.u = -1;
-    piece.pos.v = 0;
+    next_piece();
   } else
     piece.pos.v += 1;
 }
@@ -169,6 +219,18 @@ void tetris::input(event ev) {
     while (!collision(p))
       p.pos.v += 1;
     piece.pos.v = p.pos.v - 1;
+    break;
+  case EVENT_SWAP:
+  {
+    tetris::type t;
+    piece.pos.u = 0;
+    piece.pos.v = 0;
+    t = piece.type;
+    piece.type = swap;
+    swap = t;
+    break;
+  }
+  default:
     break;
   }
 }

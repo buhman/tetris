@@ -99,45 +99,11 @@ struct _ubo {
 };
 
 static size_t uniformDynamicAlignment;
-static int uniformModelInstances = 200;
+static int maxTetrisQueueSize = 5;
+static int uniformModelInstances = (10 * 20) + (maxTetrisQueueSize * 4) + 4;
 static size_t uniformDynamicBufferSize;
 static size_t uboInstanceSize = (sizeof (_ubo));
 static void * uboModels;
-
-/*
-0.866025 -0.5
-0.866025 0.5
-0.0 1
--0.866025 0.5
--0.866025 -0.5
-0.0 -1
-*/
-
-/*
-const std::vector<vertex> vertices = {
-  {{0.866f, -0.5f}, {1.0f, 1.0f, 0.0f}},
-  {{0.866f, 0.5f}, {1.0f, 1.0f, 0.0f}},
-  {{0.0, 1.0f}, {1.0f, 1.0f, 0.0f}},
-
-  {{-0.866f, 0.5f}, {0.0f, 1.0f, 1.0f}},
-  {{-0.866f, -0.5f}, {0.0f, 1.0f, 1.0f}},
-  {{0.0, -1.0f}, {0.0f, 1.0f, 1.0f}},
-
-  {{0.0, 1.0f}, {1.0f, 0.0f, 1.0f}},
-  {{-0.866f, 0.5f}, {1.0f, 0.0f, 1.0f}},
-  {{0.0, -1.0f}, {1.0f, 0.0f, 1.0f}},
-
-  {{0.0, -1.0f}, {1.0f, 1.0f, 1.0f}},
-  {{0.866f, -0.5f}, {1.0f, 1.0f, 1.0f}},
-  {{0.0, 1.0f}, {1.0f, 1.0f, 1.0f}},
-};
-*/
-
-/*
-  -y
--x    x
-   y
- */
 
 // clockwise
 const std::vector<vertex> vertices = {
@@ -198,6 +164,8 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
     tetris::input(tetris::EVENT_DOWN);
   else if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
     tetris::input(tetris::EVENT_DROP);
+  else if (key == GLFW_KEY_LEFT_ALT && action == GLFW_PRESS)
+    tetris::input(tetris::EVENT_SWAP);
 }
 
 void initWindow() {
@@ -1453,7 +1421,7 @@ void updateUniformBuffer(uint32_t currentImage) {
       tetris::cell cell = tetris::board[u][v];
       _ubo* ubo = (_ubo*)(((uint64_t)uboModels + (i * uniformDynamicAlignment)));
       ubo->model = glm::translate(glm::mat4(1.0f),
-                                  glm::vec3(-0.45f + (float)u * 0.1f, -0.95f + (float)v * 0.1f, 0.0f));
+                                  glm::vec3(-0.45f + (float)u * 0.1f, -0.95f + (float)v * 0.1f, 0.1f));
 
       if (cell.empty)
         ubo->color = {0.0f, 0.0f, 0.0f};
@@ -1462,8 +1430,37 @@ void updateUniformBuffer(uint32_t currentImage) {
     }
   }
 
+  tetris::coord *offset;
+  for (int qi = 0; qi < maxTetrisQueueSize; qi++) {
+    tetris::type queueType = tetris::queue[4 - qi];
+    offset = tetris::offsets[queueType][0];
+    for (int ti = 0; ti < 4; ti++) {
+      int qti = 200 + qi + (5 * ti);
+      assert(qti >= 200 && qti < (200 + (4 * 5)));
+      _ubo* ubo = (_ubo*)(((uint64_t)uboModels + (qti * uniformDynamicAlignment)));
+      //ubo->model = glm::mat4(1.0f);
+      int u = 13 + offset[ti].u;
+      int v = 1 + (qi * 3.5) + offset[ti].v;
+      ubo->model = glm::translate(glm::mat4(1.0f),
+                                  glm::vec3(-0.95f + (float)u * 0.1f, -0.95f + (float)v * 0.1f, 0.0f));
+      ubo->color = cellColors[queueType];
+    }
+  }
+
+  offset = tetris::offsets[tetris::swap][0];
   for (int i = 0; i < 4; i++) {
-    tetris::coord *offset = tetris::offsets[tetris::piece.type][tetris::piece.facing];
+    int u = -2 + offset[i].u;
+    int v = 1 + offset[i].v;
+    int w = 200 + 20 + i;
+
+    _ubo* ubo = (_ubo*)(((uint64_t)uboModels + (w * uniformDynamicAlignment)));
+    ubo->model = glm::translate(glm::mat4(1.0f),
+                                glm::vec3(-0.95f + (float)u * 0.1f, -0.95f + (float)v * 0.1f, 0.0f));
+    ubo->color = cellColors[tetris::swap];
+  }
+
+  offset = tetris::offsets[tetris::piece.type][tetris::piece.facing];
+  for (int i = 0; i < 4; i++) {
     int q = tetris::piece.pos.u + offset[i].u;
     int r = tetris::piece.pos.v + offset[i].v;
     int w = q + (10 * r);

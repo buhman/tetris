@@ -25,7 +25,8 @@ namespace tetris {
     EVENT_RIGHT,
     EVENT_DOWN,
     EVENT_DROP,
-    EVENT_SPIN
+    EVENT_SPIN,
+    EVENT_SWAP
   };
 
   struct cell {
@@ -50,6 +51,8 @@ namespace tetris {
   extern coord offsets[TET_LAST][4][4];
 
   extern tetronimo piece;
+  extern std::vector<tetris::type> queue;
+  extern tetris::type swap;
 
   void initBoard();
 
