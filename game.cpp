@@ -184,6 +184,18 @@ std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
   return attributeDescriptions;
 }
 
+void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+  if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
+    tetris::input(tetris::EVENT_LEFT);
+  else if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS)
+    tetris::input(tetris::EVENT_RIGHT);
+  else if (key == GLFW_KEY_UP && action == GLFW_PRESS)
+    tetris::input(tetris::EVENT_SPIN);
+  else if (key == GLFW_KEY_DOWN && action == GLFW_PRESS)
+    tetris::input(tetris::EVENT_DOWN);
+  else if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+    tetris::input(tetris::EVENT_DROP);
+}
 
 void initWindow() {
   glfwInit();
@@ -192,6 +204,7 @@ void initWindow() {
   glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
   window = glfwCreateWindow(400, 400, "vulkan", nullptr, nullptr);
+  glfwSetKeyCallback(window, keyCallback);
 }
 
 void assertValidationLayers() {
@@ -965,7 +978,6 @@ void prepareUniformBuffers() {
   if (minUboAlignment > 0)
     uniformDynamicAlignment = (uniformDynamicAlignment + minUboAlignment - 1) & ~(minUboAlignment - 1);
   uniformDynamicAlignment = pow(2, ceil(log(uniformDynamicAlignment)/log(2)));
-  std::cout << "minUboAlignment: " << minUboAlignment << " uniformDynamicAlignment: " << uniformDynamicAlignment << '\n';
 
   uniformDynamicBufferSize = uniformModelInstances * uniformDynamicAlignment;
   int ret = posix_memalign(&uboModels, uniformDynamicAlignment, uniformDynamicBufferSize);
@@ -1087,7 +1099,7 @@ void createCommandBuffers() {
     renderPassInfo.renderArea.extent = swapChainExtent;
 
     std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = {{0.0, 0.0, 0.0, 1.0}};
+    clearValues[0].color = {{0.1, 0.1, 0.1, 1.0}};
     clearValues[1].depthStencil = {1.0, 0};
 
     renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
@@ -1408,12 +1420,25 @@ void updateUniformBuffer(uint32_t currentImage) {
       assert(i < uniformModelInstances);
 
       tetris::cell cell = tetris::board[u][v];
-
       _ubo* ubo = (_ubo*)(((uint64_t)uboModels + (i * uniformDynamicAlignment)));
       ubo->model = glm::translate(glm::mat4(1.0f),
                                   glm::vec3(-0.45f + (float)u * 0.1f, -0.95f + (float)v * 0.1f, 0.0f));
-      ubo->color = cellColors[cell.color];
+
+      if (cell.empty)
+        ubo->color = {0.0f, 0.0f, 0.0f};
+      else
+        ubo->color = cellColors[cell.color];
     }
+  }
+
+  for (int i = 0; i < 4; i++) {
+    tetris::coord *offset = tetris::offsets[tetris::piece.type][tetris::piece.facing];
+    int q = tetris::piece.pos.u + offset[i].u;
+    int r = tetris::piece.pos.v + offset[i].v;
+    int w = q + (10 * r);
+
+    _ubo* ubo = (_ubo*)(((uint64_t)uboModels + (w * uniformDynamicAlignment)));
+    ubo->color = cellColors[tetris::piece.type];
   }
 
   void *data;
@@ -1489,9 +1514,21 @@ void drawFrame() {
 }
 
 void loop() {
+  auto tickTime = std::chrono::high_resolution_clock::now();
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
     drawFrame();
+
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float time;
+    time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - tickTime).count();
+    if (time > 0.5f) {
+      //tickTime += std::chrono::duration<int, std::chrono::seconds::period>(1);
+      tickTime = currentTime;
+
+      tetris::tick();
+    }
   }
   std::cerr << "should close\n";
 

@@ -1,6 +1,6 @@
 all: a.out shader.frag.spv shader.vert.spv
 
-DEP = $(wildcard *.h)
+DEP = $(wildcard *.hpp)
 SRC = game.cpp tetris.cpp
 OBJ = $(SRC:.cpp=.o)
 LIBS = -lvulkan -lglfw
