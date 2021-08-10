@@ -9,18 +9,39 @@
 #include "tetris.hpp"
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-  if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
-    tetris::input(tetris::EVENT_LEFT);
-  else if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS)
-    tetris::input(tetris::EVENT_RIGHT);
-  else if (key == GLFW_KEY_UP && action == GLFW_PRESS)
-    tetris::input(tetris::EVENT_SPIN_RIGHT);
-  else if (key == GLFW_KEY_DOWN && action == GLFW_PRESS)
-    tetris::input(tetris::EVENT_DOWN);
-  else if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
-    tetris::input(tetris::EVENT_DROP);
-  else if (key == GLFW_KEY_LEFT_ALT && action == GLFW_PRESS)
-    tetris::input(tetris::EVENT_SWAP);
+  if (action == GLFW_PRESS) {
+    switch (key) {
+    case GLFW_KEY_LEFT:
+    case GLFW_KEY_J:
+      tetris::input(tetris::EVENT_LEFT);
+      break;
+    case GLFW_KEY_RIGHT:
+    case GLFW_KEY_L:
+      tetris::input(tetris::EVENT_RIGHT);
+      break;
+    case GLFW_KEY_DOWN:
+    case GLFW_KEY_K:
+      tetris::input(tetris::EVENT_DOWN);
+      break;
+    case GLFW_KEY_SPACE:
+      tetris::input(tetris::EVENT_DROP);
+      break;
+    case GLFW_KEY_S:
+      tetris::input(tetris::EVENT_SPIN_LEFT);
+      break;
+    case GLFW_KEY_F:
+      tetris::input(tetris::EVENT_SPIN_RIGHT);
+      break;
+    case GLFW_KEY_E:
+      tetris::input(tetris::EVENT_SPIN_180);
+      break;
+    case GLFW_KEY_D:
+      tetris::input(tetris::EVENT_SWAP);
+      break;
+    default:
+      break;
+    }
+  }
 }
 
 static std::set<int> present;
@@ -99,7 +120,7 @@ void joystick_callback(int jid, int event) {
     present.erase(jid);
 }
 
-void input::init_presence() {
+void input::init(GLFWwindow *window) {
   present.clear();
   for (int jid = GLFW_JOYSTICK_1; jid < GLFW_JOYSTICK_LAST; jid++) {
     if (glfwJoystickPresent(jid)) {
@@ -108,4 +129,5 @@ void input::init_presence() {
     }
   }
   glfwSetJoystickCallback(joystick_callback);
+  glfwSetKeyCallback(window, key_callback);
 }

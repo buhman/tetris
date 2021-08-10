@@ -22,7 +22,7 @@ void main() {
   vec4 size = vec4(0.05, 0.05, 0.05, 1.0);
 
   gl_Position = view.mat * model.mat * (vec4(inPosition, 1.0) * size);
-  fragColor = model.color;
+  fragColor = inColor * model.color;
   fragTexCoord = inTexCoord;
   fragPos = gl_Position.xyz;
 }

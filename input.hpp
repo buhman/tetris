@@ -2,5 +2,5 @@
 
 namespace input {
   void poll_gamepads();
-  void init_presence();
+  void init(GLFWwindow *window);
 }
