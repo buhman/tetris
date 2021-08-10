@@ -5,6 +5,7 @@
 #include <iostream>
 #include <optional>
 #include <set>
+#include <thread>
 #include <stdexcept>
 #include <vector>
 
@@ -193,7 +194,7 @@ void initWindow() {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-  window = glfwCreateWindow(400, 400, "vulkan", nullptr, nullptr);
+  window = glfwCreateWindow(800, 800, "tak tetris", nullptr, nullptr);
 }
 
 bool assertValidationLayers() {
@@ -1594,21 +1595,46 @@ void drawFrame() {
   currentFrame = (currentFrame + 1) & MAX_FRAMES_IN_FLIGHT;
 }
 
+typedef std::chrono::duration<float, std::chrono::seconds::period> duration;
+typedef std::chrono::high_resolution_clock clock_;
+
 void loop() {
-  auto tickTime = std::chrono::high_resolution_clock::now();
+  auto fpsTime = clock_::now();
+  auto tickTime = clock_::now();
+  int frames = 0;
 
   while (!glfwWindowShouldClose(window)) {
+    auto start = clock_::now();
+
     glfwPollEvents();
     input::poll_gamepads();
     drawFrame();
 
-    auto currentTime = std::chrono::high_resolution_clock::now();
     float time;
-    time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - tickTime).count();
+    auto currentTime = clock_::now();
+    time = duration(currentTime - tickTime).count();
     if (time > 0.5f) {
       tickTime = currentTime;
-
       tetris::tick();
+    }
+
+    //
+    frames += 1;
+    currentTime = clock_::now();
+    time = duration(currentTime - fpsTime).count();
+    if (time > 1.0f) {
+      std::cerr << "frames: " << frames << '\n';
+      fpsTime = currentTime;
+      frames = 0;
+    }
+
+    auto end = clock_::now();
+    auto elapsed = duration(end - start);
+    if (elapsed.count() < 0.016666666666666666f) {
+      //std::cerr << "sleep for " << 0.2f - elapsed.count() << '\n';
+      std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::duration<float>(0.016666666666666666f - elapsed.count())
+      ));
     }
   }
   std::cerr << "should close\n";
