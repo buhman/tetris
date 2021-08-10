@@ -3,7 +3,7 @@ all: a.out shader.frag.spv shader.vert.spv
 include config.mk
 
 DEP = $(wildcard *.hpp)
-SRC = game.cpp tetris.cpp stb_image.c
+SRC = game.cpp tetris.cpp input.cpp stb_image.c
 OBJ = $(SRC:.cpp=.o)
 
 %.o: %.cpp

@@ -49,14 +49,17 @@ tetronimo tetris::piece = {
 
 std::set<tetris::type> bag;
 std::vector<tetris::type> tetris::queue;
-tetris::type tetris::swap = TET_O;
+
+bool swapped;
+tetris::type tetris::swap = TET_LAST;
+
+int tetris::drop_row;
 
 static auto seed = std::chrono::system_clock::now().time_since_epoch().count();
 std::default_random_engine generator (seed);
 
 void refill_bag() {
   if (bag.size() == 0) {
-    std::cerr << "refill" << '\n';
     std::set<tetris::type>::iterator it = bag.end();
     for (int i = 0; i != TET_LAST; i++) {
       tetris::type t = static_cast<tetris::type>(i);
@@ -87,20 +90,52 @@ tetris::type next_type() {
   return next;
 }
 
-void next_piece() {
-  piece.type = next_type();
+bool collision(tetronimo p) {
+  for (int i = 0; i < 4; i++) {
+    coord *offset = offsets[p.type][p.facing];
+    int q = p.pos.u + offset[i].u;
+    int r = p.pos.v + offset[i].v;
+
+    if (r >= 0) {
+      tetris::cell cell = tetris::board[q][r];
+      if (!cell.empty || r == 20 || q == -1 || q == 10)
+        return true;
+    }
+
+  }
+  return false;
+}
+
+void update_drop_row() {
+  tetronimo p = piece;
+  while (!collision(p))
+    p.pos.v += 1;
+  tetris::drop_row = p.pos.v - 1;
+}
+
+void fall();
+
+void next_piece(tetris::type t) {
+  swapped = false;
+  if (t == TET_LAST)
+    piece.type = next_type();
+  else
+    piece.type = t;
+
   piece.pos.u = 0;
-  piece.pos.v = 0;
+  piece.pos.v = -3;
+  update_drop_row();
+  fall();
 }
 
 void tetris::initBoard() {
-  next_piece();
-
   for (int u = 0; u < 10; u++) {
     for (int v = 0; v < 20; v++) {
       board[u][v].empty = true;
     }
   }
+
+  next_piece(TET_LAST);
 }
 
 void tetris::shiftDown() {
@@ -114,20 +149,6 @@ void tetris::shiftDown() {
       }
     }
   }
-}
-
-bool collision(tetronimo p) {
-  for (int i = 0; i < 4; i++) {
-    coord *offset = offsets[p.type][p.facing];
-    int q = p.pos.u + offset[i].u;
-    int r = p.pos.v + offset[i].v;
-
-    tetris::cell cell = tetris::board[q][r];
-    if (!cell.empty || r == 20 || q == -1 || q == 10)
-      return true;
-
-  }
-  return false;
 }
 
 void place() {
@@ -181,13 +202,17 @@ void clearLines() {
   }
 }
 
-void drop() {
+void fall() {
   tetronimo p = piece;
   p.pos.v += 1;
   if (collision(p)) {
-    place();
-    clearLines();
-    next_piece();
+    if (piece.pos.v <= -2) {
+      initBoard();
+    } else {
+      place();
+      clearLines();
+      next_piece(TET_LAST);
+    }
   } else
     piece.pos.v += 1;
 }
@@ -205,8 +230,18 @@ void tetris::input(event ev) {
     if (!collision(p))
       piece.pos.u += 1;
     break;
-  case EVENT_SPIN:
-    p.facing = static_cast<tetris::dir>((piece.facing + 1) % (int)DIR_LAST);
+  case EVENT_SPIN_LEFT:
+    p.facing = static_cast<tetris::dir>(((unsigned int)piece.facing + 1) % (unsigned int)DIR_LAST);
+    if (!collision(p))
+      piece.facing = p.facing;
+    break;
+  case EVENT_SPIN_RIGHT:
+    p.facing = static_cast<tetris::dir>(((unsigned int)piece.facing - 1) % (unsigned int)DIR_LAST);
+    if (!collision(p))
+      piece.facing = p.facing;
+    break;
+  case EVENT_SPIN_180:
+    p.facing = static_cast<tetris::dir>(((unsigned int)piece.facing + 2) % (unsigned int)DIR_LAST);
     if (!collision(p))
       piece.facing = p.facing;
     break;
@@ -216,27 +251,28 @@ void tetris::input(event ev) {
       piece.pos.v += 1;
     break;
   case EVENT_DROP:
-    while (!collision(p))
-      p.pos.v += 1;
-    piece.pos.v = p.pos.v - 1;
+    piece.pos.v = tetris::drop_row;
+    fall();
     break;
   case EVENT_SWAP:
   {
-    tetris::type t;
-    piece.pos.u = 0;
-    piece.pos.v = 0;
-    t = piece.type;
-    piece.type = swap;
-    swap = t;
+    if (!swapped) {
+      tetris::type t;
+      t = piece.type;
+      next_piece(swap);
+      swap = t;
+      swapped = true;
+    }
     break;
   }
   default:
     break;
   }
+  update_drop_row();
 }
 
 void tetris::tick() {
   //shiftDown();
   //
-  drop();
+  fall();
 }

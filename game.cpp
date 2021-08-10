@@ -25,8 +25,10 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "stb_image.h"
-#include "tetris.hpp"
+
 #include "game.hpp"
+#include "input.hpp"
+#include "tetris.hpp"
 
 static GLFWwindow * window;
 static VkInstance instance;
@@ -153,21 +155,6 @@ std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
   return attributeDescriptions;
 }
 
-void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-  if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
-    tetris::input(tetris::EVENT_LEFT);
-  else if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS)
-    tetris::input(tetris::EVENT_RIGHT);
-  else if (key == GLFW_KEY_UP && action == GLFW_PRESS)
-    tetris::input(tetris::EVENT_SPIN);
-  else if (key == GLFW_KEY_DOWN && action == GLFW_PRESS)
-    tetris::input(tetris::EVENT_DOWN);
-  else if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
-    tetris::input(tetris::EVENT_DROP);
-  else if (key == GLFW_KEY_LEFT_ALT && action == GLFW_PRESS)
-    tetris::input(tetris::EVENT_SWAP);
-}
-
 void initWindow() {
   glfwInit();
 
@@ -175,7 +162,6 @@ void initWindow() {
   glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
   window = glfwCreateWindow(400, 400, "vulkan", nullptr, nullptr);
-  glfwSetKeyCallback(window, keyCallback);
 }
 
 bool assertValidationLayers() {
@@ -1440,33 +1426,47 @@ void updateUniformBuffer(uint32_t currentImage) {
       _ubo* ubo = (_ubo*)(((uint64_t)uboModels + (qti * uniformDynamicAlignment)));
       //ubo->model = glm::mat4(1.0f);
       int u = 13 + offset[ti].u;
-      int v = 1 + (qi * 3.5) + offset[ti].v;
+      int v = -4 + (qi * 3) + offset[ti].v;
       ubo->model = glm::translate(glm::mat4(1.0f),
-                                  glm::vec3(-0.95f + (float)u * 0.1f, -0.95f + (float)v * 0.1f, 0.0f));
+                                  glm::vec3(-0.75f + (float)u * 0.1f, -0.95f + (float)v * 0.1f, 0.0f));
+      ubo->model = glm::scale(glm::mat4(1.0f), glm::vec3(0.7f, 0.7f, 0.0f)) * ubo->model;
+
       ubo->color = cellColors[queueType];
     }
   }
 
-  offset = tetris::offsets[tetris::swap][0];
   for (int i = 0; i < 4; i++) {
-    int u = -2 + offset[i].u;
-    int v = 1 + offset[i].v;
     int w = 200 + 20 + i;
 
     _ubo* ubo = (_ubo*)(((uint64_t)uboModels + (w * uniformDynamicAlignment)));
-    ubo->model = glm::translate(glm::mat4(1.0f),
-                                glm::vec3(-0.95f + (float)u * 0.1f, -0.95f + (float)v * 0.1f, 0.0f));
-    ubo->color = cellColors[tetris::swap];
+
+    if (tetris::swap != tetris::TET_LAST) {
+      offset = tetris::offsets[tetris::swap][0];
+      int u = -2 + offset[i].u;
+      int v = 1 + offset[i].v;
+      ubo->model = glm::translate(glm::mat4(1.0f),
+                                  glm::vec3(-0.95f + (float)u * 0.1f, -0.95f + (float)v * 0.1f, 0.0f));
+      ubo->color = cellColors[tetris::swap];
+    } else
+      ubo->color = glm::vec3(0.0f, 0.0f, 0.0f);
   }
 
   offset = tetris::offsets[tetris::piece.type][tetris::piece.facing];
   for (int i = 0; i < 4; i++) {
     int q = tetris::piece.pos.u + offset[i].u;
     int r = tetris::piece.pos.v + offset[i].v;
-    int w = q + (10 * r);
+    int w0 = q + (10 * r);
 
-    _ubo* ubo = (_ubo*)(((uint64_t)uboModels + (w * uniformDynamicAlignment)));
-    ubo->color = cellColors[tetris::piece.type];
+    int r1 = tetris::drop_row + offset[i].v;
+    int w1 = q + (10 * r1);
+    assert(w1 >= 0);
+    _ubo* ubo1 = (_ubo*)(((uint64_t)uboModels + (w1 * uniformDynamicAlignment)));
+    ubo1->color = glm::vec3(0.2f, 0.2f, 0.2f) * cellColors[tetris::piece.type];
+
+    if (w0 >= 0) {
+      _ubo* ubo0 = (_ubo*)(((uint64_t)uboModels + (w0 * uniformDynamicAlignment)));
+      ubo0->color = cellColors[tetris::piece.type];
+    }
   }
 
   void *data;
@@ -1546,13 +1546,13 @@ void loop() {
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
+    input::poll_gamepads();
     drawFrame();
 
     auto currentTime = std::chrono::high_resolution_clock::now();
     float time;
     time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - tickTime).count();
     if (time > 0.5f) {
-      //tickTime += std::chrono::duration<int, std::chrono::seconds::period>(1);
       tickTime = currentTime;
 
       tetris::tick();
@@ -1650,6 +1650,7 @@ int main() {
   tetris::initBoard();
 
   initWindow();
+  input::init_presence();
   initVulkan();
   loop();
   cleanup();

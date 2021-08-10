@@ -25,7 +25,9 @@ namespace tetris {
     EVENT_RIGHT,
     EVENT_DOWN,
     EVENT_DROP,
-    EVENT_SPIN,
+    EVENT_SPIN_LEFT,
+    EVENT_SPIN_RIGHT,
+    EVENT_SPIN_180,
     EVENT_SWAP
   };
 
@@ -53,6 +55,7 @@ namespace tetris {
   extern tetronimo piece;
   extern std::vector<tetris::type> queue;
   extern tetris::type swap;
+  extern int drop_row;
 
   void initBoard();
 
