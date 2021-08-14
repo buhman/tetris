@@ -96,59 +96,34 @@ struct vertex {
 
 struct _ubo {
   alignas(16) glm::mat4 model;
+  alignas(16) glm::mat4 view;
   alignas(16) glm::vec3 color;
 };
 
 static size_t uniformDynamicAlignment;
-static int maxTetrisQueueSize = 5;
-static int uniformModelInstances = (10 * 20) + (maxTetrisQueueSize * 4) + 4;
+
+constexpr int tetrisFrames = 2;
+constexpr int tetrisQueueSize = 5;
+constexpr int tetrisQueueInstances = tetrisQueueSize * 4 * tetrisFrames;
+constexpr int tetrisFieldInstances = tetris::rows * tetris::columns * tetrisFrames;
+constexpr int uniformModelInstances = 5 + tetrisFieldInstances + tetrisQueueInstances + 4;
 static size_t uniformDynamicBufferSize;
 static size_t uboInstanceSize = (sizeof (_ubo));
 static void * uboModels;
 
 // clockwise
 const std::vector<vertex> vertices = {
-  {{ -1.0f, -1.0f, 0.2f}, {1.0f, 1.0f, 1.0f}, {-1.0f, -1.0f}},
-  {{  1.0f, -1.0f, 0.2f}, {1.0f, 1.0f, 1.0f}, { 1.0f, -1.0f}},
-  {{  1.0f,  1.0f, 0.2f}, {1.0f, 1.0f, 1.0f}, { 1.0f,  1.0f}},
-  {{ -1.0f,  1.0f, 0.2f}, {1.0f, 1.0f, 1.0f}, {-1.0f,  1.0f}},
-
-  {{ -1.0f, -1.0f, 0.0f}, {0.8f, 0.8f, 0.8f}, {-1.0f, -1.0f}},
-  {{  1.0f, -1.0f, 0.0f}, {0.8f, 0.8f, 0.8f}, { 1.0f, -1.0f}},
-  {{  1.0f,  1.0f, 0.0f}, {0.8f, 0.8f, 0.8f}, { 1.0f,  1.0f}},
-  {{ -1.0f,  1.0f, 0.0f}, {0.8f, 0.8f, 0.8f}, {-1.0f,  1.0f}},
-
-  {{ -0.75f, -0.75f, 0.0f}, {0.8f, 0.8f, 0.8f}, {-1.0f, -1.0f}},
-  {{  0.75f, -0.75f, 0.0f}, {0.8f, 0.8f, 0.8f}, { 1.0f, -1.0f}},
-  {{  0.75f,  0.75f, 0.0f}, {0.8f, 0.8f, 0.8f}, { 1.0f,  1.0f}},
-  {{ -0.75f,  0.75f, 0.0f}, {0.8f, 0.8f, 0.8f}, {-1.0f,  1.0f}},
+  {{ 0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 0.0f}, {-1.0f, -1.0f}}, // yellow
+  {{ 0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 1.0f}, { 1.0f, -1.0f}}, // cyan
+  {{ 1.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 1.0f}, { 1.0f,  1.0f}}, // magenta
+  {{ 1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {-1.0f,  1.0f}}, // red
 };
 
 const std::vector<uint16_t> indices = {
+  0, 1, 2, 3, 0,
+
   0, 1, 2,
   2, 3, 0,
-
-  /*
-     0------1
-     |\    /|
-     | 4  5 |
-     |      |
-     | 7  6 |
-     |/    \|
-     3------2
-  */
-
-  0, 1, 4,
-  1, 5, 4,
-
-  1, 2, 6,
-  6, 5, 1,
-
-  6, 2, 3,
-  3, 7, 6,
-
-  3, 0, 7,
-  7, 0, 4,
 };
 
 struct mvp_t {
@@ -584,7 +559,7 @@ void createRenderPass() {
   subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
   subpass.colorAttachmentCount = 1;
   subpass.pColorAttachments = &colorAttachmentRef;
-  subpass.pDepthStencilAttachment = &depthAttachmentRef;
+  //subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
   VkSubpassDependency dependency{};
   dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -676,7 +651,7 @@ void createGraphicsPipelines() {
   inputAssemblies[0].primitiveRestartEnable = VK_FALSE;
 
   inputAssemblies[1].sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-  inputAssemblies[1].topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+  inputAssemblies[1].topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
   inputAssemblies[1].primitiveRestartEnable = VK_FALSE;
 
   VkViewport viewport{};
@@ -705,7 +680,7 @@ void createGraphicsPipelines() {
     rasterizers[i].depthClampEnable = VK_FALSE;
     rasterizers[i].rasterizerDiscardEnable = VK_FALSE;
     rasterizers[i].polygonMode = polygonModes[i];
-    rasterizers[i].lineWidth = 2.0f;
+    rasterizers[i].lineWidth = 1.0f;
     //rasterizers[i].cullMode = VK_CULL_MODE_NONE;
     rasterizers[i].cullMode = VK_CULL_MODE_BACK_BIT;
     rasterizers[i].frontFace = VK_FRONT_FACE_CLOCKWISE;
@@ -1131,30 +1106,28 @@ void createCommandBuffers() {
 
     //
 
-    vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline[0]);
-    for (uint32_t j = 0; j < uniformModelInstances; j++) {
-      uint32_t dynamicOffset = j * static_cast<uint32_t>(uniformDynamicAlignment);
+    uint32_t dynamicOffset;
 
+    vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline[0]);
+    for (uint32_t j = 0; j < tetrisFieldInstances; j++) {
+      dynamicOffset = j * static_cast<uint32_t>(uniformDynamicAlignment);
       vkCmdBindDescriptorSets(commandBuffers[i],
                               VK_PIPELINE_BIND_POINT_GRAPHICS,
                               pipelineLayout, 0, 1,
                               &descriptorSets[i], 1, &dynamicOffset);
 
-      vkCmdDrawIndexed(commandBuffers[i], 6, 1, 0, 0, 0);
+      vkCmdDrawIndexed(commandBuffers[i], 6, 1, 5, 0, 0);
     }
 
-    //
-
-    //vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline[1]);
-    for (uint32_t j = 0; j < uniformModelInstances; j++) {
-      uint32_t dynamicOffset = j * static_cast<uint32_t>(uniformDynamicAlignment);
-
+    vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline[1]);
+    for (uint32_t j = 0; j < 5; j++) {
+      dynamicOffset = (tetrisFieldInstances + j) * static_cast<uint32_t>(uniformDynamicAlignment);
       vkCmdBindDescriptorSets(commandBuffers[i],
                               VK_PIPELINE_BIND_POINT_GRAPHICS,
                               pipelineLayout, 0, 1,
                               &descriptorSets[i], 1, &dynamicOffset);
 
-      vkCmdDrawIndexed(commandBuffers[i], 24, 1, 6, 4, 0);
+      vkCmdDrawIndexed(commandBuffers[i], 5, 1, 0, 0, 0);
     }
 
     //
@@ -1450,89 +1423,140 @@ void initVulkan() {
   createSync();
 }
 
+int getCellIndex(int u, int v, int frameIndex) {
+  return (v * tetris::columns + u) + (frameIndex * tetris::rows * tetris::columns);
+}
+
 void updateUniformBuffer(uint32_t currentImage) {
-  for (int u = 0; u < 10; u++) {
-    for (int v = 0; v < 20; v++) {
-      int i = u + (10 * v);
-      assert(i < uniformModelInstances);
+  /*
+    views
+  */
 
-      tetris::cell cell = tetris::board[u][v];
-      _ubo* ubo = (_ubo*)(((uint64_t)uboModels + (i * uniformDynamicAlignment)));
-      ubo->model = glm::translate(glm::mat4(1.0f),
-                                  glm::vec3(-0.45f + (float)u * 0.1f, -0.95f + (float)v * 0.1f, 0.2f));
+  /*
+    red x:
+        0.0 * s + t = -1.0
+        40.0 * s + t = 1.0
+      s=0.05, t=-1
+    red y:
+        0.0 * s + t = 1.0
+        40.0 * s + t = -1.0
+      s=-0.05, t=1
+  */
 
-      if (cell.empty)
-        ubo->color = {0.0f, 0.0f, 0.0f};
-      else
-        ubo->color = cellColors[cell.color];
+  /*
+    green[0] x:
+        0.0 * s + t = 0.0
+        20.0 * s + t = 20.0
+      s=1.0, t=0.0
+    green[0] y:
+        0.0 * s + t = 10.0
+        20.0 * s + t = 30.0
+      s=1.0, t=10.0
+   */
+
+  /*
+    green[1] x:
+        0.0 * s + t = 0.0
+        20.0 * s + t = 20.0
+      s=1.0, t=20.0
+    green[1] y:
+        0.0 * s + t = 10.0
+        20.0 * s + t = 30.0
+      s=1.0, t=10.0
+   */
+
+  glm::mat4 _ndc;
+  _ndc = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 1.0f, 0.0f));
+  _ndc = glm::scale(_ndc, glm::vec3(0.05f, -0.05f, 0.0f));
+
+  glm::mat4 _frame[2];
+  _frame[0] = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 10.0f, 0.0f));
+  _frame[1] = glm::translate(glm::mat4(1.0f), glm::vec3(20.0f, 10.0f, 0.0f));
+
+  glm::mat4 _field;
+  _field = glm::translate(glm::mat4(1.0f), glm::vec3(5.0f, 0.0f, 0.0f));
+
+  /*
+     model-views
+  */
+
+  int uboOffset = 0;
+
+  int frameIndex = 0;
+  for (auto& frame : tetris::frames) {
+    for (int u = 0; u < tetris::columns; u++) {
+      for (int v = 0; v < tetris::rows; v++) {
+        const tetris::cell& cell = frame.field[u][v];
+        const int uboCellIndex = getCellIndex(u, v, frameIndex);
+        _ubo* _cell = (_ubo*)(((uint64_t)uboModels + (uboCellIndex * uniformDynamicAlignment)));
+        _cell->model = glm::translate(glm::mat4(1.0f), glm::vec3((float)u, (float)v, 0.0f));
+        _cell->view = _ndc * _frame[frameIndex] * _field;
+        if (cell.empty)
+          _cell->color = glm::vec3(0.0f, 0.0f, 0.0f);
+        else
+          _cell->color = cellColors[cell.color];
+      }
     }
+
+    for (int i = 0; i < 4; i++) {
+      tetris::coord off = tetris::offsets[frame.piece.tet][frame.piece.facing][i];
+      const int uboCellIndex = getCellIndex(frame.piece.pos.u + off.u, frame.piece.pos.v + off.v, frameIndex);
+      _ubo* _cell = (_ubo*)(((uint64_t)uboModels + (uboCellIndex * uniformDynamicAlignment)));
+      _cell->color = cellColors[frame.piece.tet];
+    }
+
+    frameIndex++;
+  }
+  uboOffset = tetrisFieldInstances;
+
+  _ubo* red = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
+  red->model = glm::scale(glm::mat4(1.0f), glm::vec3(40.0f, 40.0f, 0.0f));
+  red->view = _ndc;
+  //red->color = glm::vec3(1.0f, 0.0f, 0.0f);
+  red->color = glm::vec3(0.1f, 0.1f, 0.1f);
+
+
+  for (int i = 0; i < 2; i++) {
+    int off = i * 2 + 1;
+    //int off = i * 3 + 1;
+
+    _ubo* green = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
+    green->model = glm::scale(glm::mat4(1.0f), glm::vec3(20.0f, 20.0f, 0.0f));
+    green->view = _ndc * _frame[i];
+    //green->color = glm::vec3(0.0f, 1.0f, 0.0f);
+    red->color = glm::vec3(0.1f, 0.1f, 0.1f);
+
+    _ubo* cyan = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
+    cyan->model = glm::scale(glm::mat4(1.0f), glm::vec3(10.0f, 20.0f, 0.0f));
+    cyan->view = _ndc * _frame[i] * _field;
+    cyan->color = glm::vec3(0.0f, 1.0f, 1.0f);
+
+    /*
+    _ubo* magenta = (_ubo*)(((uint64_t)uboModels + ((2 + off) * uniformDynamicAlignment)));
+    magenta->model = glm::mat4(1.0f);
+    magenta->view = _ndc * _frame[i] * _play;
+    magenta->color = glm::vec3(1.0f, 0.0f, 1.0f);
+    */
   }
 
-  tetris::coord *offset;
-  for (int qi = 0; qi < maxTetrisQueueSize; qi++) {
-    tetris::type queueType = tetris::queue[4 - qi];
-    offset = tetris::offsets[queueType][0];
-    for (int ti = 0; ti < 4; ti++) {
-      int qti = 200 + qi + (5 * ti);
-      assert(qti >= 200 && qti < (200 + (4 * 5)));
-      _ubo* ubo = (_ubo*)(((uint64_t)uboModels + (qti * uniformDynamicAlignment)));
-      //ubo->model = glm::mat4(1.0f);
-      int u = 13 + offset[ti].u;
-      int v = -4 + (qi * 3) + offset[ti].v;
-      ubo->model = glm::translate(glm::mat4(1.0f),
-                                  glm::vec3(-0.75f + (float)u * 0.1f, -0.95f + (float)v * 0.1f, 0.0f));
-      ubo->model = glm::scale(glm::mat4(1.0f), glm::vec3(0.7f, 0.7f, 1.0f)) * ubo->model;
+  /*
 
-      ubo->color = cellColors[queueType];
-    }
-  }
-
-  for (int i = 0; i < 4; i++) {
-    int w = 200 + 20 + i;
-
-    _ubo* ubo = (_ubo*)(((uint64_t)uboModels + (w * uniformDynamicAlignment)));
-
-    if (tetris::swap != tetris::TET_LAST) {
-      offset = tetris::offsets[tetris::swap][0];
-      int u = -2 + offset[i].u;
-      int v = 1 + offset[i].v;
-      ubo->model = glm::translate(glm::mat4(1.0f),
-                                  glm::vec3(-0.95f + (float)u * 0.1f, -0.95f + (float)v * 0.1f, 0.0f));
-      ubo->color = cellColors[tetris::swap];
-    } else {
-      ubo->model = glm::mat4(0.0f);
-      ubo->color = glm::vec3(0.0f, 0.0f, 0.0f);
-    }
-  }
-
-  offset = tetris::offsets[tetris::piece.type][tetris::piece.facing];
-  for (int i = 0; i < 4; i++) {
-    int q = tetris::piece.pos.u + offset[i].u;
-    int r = tetris::piece.pos.v + offset[i].v;
-    int w0 = q + (10 * r);
-
-    int r1 = tetris::drop_row + offset[i].v;
-    int w1 = q + (10 * r1);
-    if (w1 >= 0) {
-      _ubo* ubo1 = (_ubo*)(((uint64_t)uboModels + (w1 * uniformDynamicAlignment)));
-      ubo1->color = glm::vec3(0.2f, 0.2f, 0.2f) * cellColors[tetris::piece.type];
-    }
-
-    if (w0 >= 0) {
-      _ubo* ubo0 = (_ubo*)(((uint64_t)uboModels + (w0 * uniformDynamicAlignment)));
-      ubo0->color = cellColors[tetris::piece.type];
-    }
-  }
-
+   */
   void *data;
+
   vkMapMemory(logicalDevice, uniformDynamicBuffersMemory[currentImage], 0, uniformDynamicBufferSize, 0, &data);
   memcpy(data, uboModels, uniformDynamicBufferSize);
   vkUnmapMemory(logicalDevice, uniformDynamicBuffersMemory[currentImage]);
 
   //
+
   glm::mat4 view = glm::mat4(1.0f);
-  float ratio = ((float)swapChainExtent.width / (float)swapChainExtent.height);
-  view[0][0] = 1.0f / ratio;
+  float ratio = ((float)swapChainExtent.height / (float)swapChainExtent.width);
+  if (ratio < 0.5) {
+    view[0][0] = (ratio * 2);
+    view[1][1] = 1.0f / 0.5f;
+  } else
+    view[1][1] = 1.0f / ratio;
 
   vkMapMemory(logicalDevice, uniformBuffersMemory[currentImage], 0, uniformBufferSize, 0, &data);
   memcpy(data, &view, uniformBufferSize);
@@ -1608,7 +1632,7 @@ void loop() {
     auto start = clock_::now();
 
     glfwPollEvents();
-    input::poll_gamepads();
+    //input::poll_gamepads();
     drawFrame();
 
     float time;
@@ -1616,7 +1640,7 @@ void loop() {
     time = duration(currentTime - tickTime).count();
     if (time > 0.5f) {
       tickTime = currentTime;
-      tetris::tick();
+      //tetris::tick();
     }
 
     //
@@ -1624,7 +1648,7 @@ void loop() {
     currentTime = clock_::now();
     time = duration(currentTime - fpsTime).count();
     if (time > 1.0f) {
-      std::cerr << "frames: " << frames << '\n';
+      //std::cerr << "frames: " << frames << '\n';
       fpsTime = currentTime;
       frames = 0;
     }
@@ -1727,10 +1751,10 @@ void cleanup() {
 }
 
 int main() {
-  tetris::initBoard();
+  tetris::init();
 
   initWindow();
-  input::init(window);
+  //input::init(window);
   initVulkan();
   loop();
   cleanup();

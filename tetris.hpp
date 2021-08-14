@@ -1,16 +1,20 @@
 #pragma once
 
+#include <vector>
+#include <array>
+#include <set>
+
 namespace tetris {
-  enum type {
-    TET_Z,
-    TET_L,
-    TET_O,
-    TET_S,
-    TET_I,
-    TET_J,
-    TET_T,
-    TET_LAST,
-    TET_LAST_COLOR
+  enum tet {
+    z,
+    l,
+    o,
+    s,
+    i,
+    j,
+    t,
+    last,
+    last_color
   };
 
   enum dir {
@@ -33,7 +37,7 @@ namespace tetris {
   };
 
   struct cell {
-    tetris::type color;
+    tetris::tet color;
     bool empty;
   };
 
@@ -42,27 +46,35 @@ namespace tetris {
     int v; // uint8_t
   };
 
-  struct tetronimo {
-    tetris::type type;
+  struct piece {
+    tetris::tet tet;
     tetris::coord pos;
     tetris::dir facing;
+    bool swapped;
+    int drop_row;
   };
 
+  extern coord offsets[tetris::tet::last][4][4];
 
-  extern cell board[10][20];
+  constexpr int rows = 40;
+  constexpr int columns = 10;
+  typedef std::array<std::array<cell, rows>, columns> field;
+  typedef std::set<tetris::tet> bag;
+  typedef std::vector<tetris::tet> queue;
 
-  extern coord offsets[TET_LAST][4][4];
+  struct frame {
+    tetris::field field;
+    tetris::bag bag;
+    tetris::queue queue;
+    tetris::piece piece;
+    tetris::tet swap;
+  };
 
-  extern tetronimo piece;
-  extern std::vector<tetris::type> queue;
-  extern tetris::type swap;
-  extern int drop_row;
+  extern std::vector<frame> frames;
 
-  void initBoard();
+  void init_field(tetris::field& field);
 
-  void tick();
+  void reset_frame(tetris::frame& frame);
 
-  void input(event ev);
-
-  void shiftDown();
+  void init();
 }
