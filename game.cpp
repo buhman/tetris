@@ -25,8 +25,6 @@
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "stb_image.h"
-
 #include "game.hpp"
 #include "input.hpp"
 #include "tetris.hpp"
@@ -1318,10 +1316,13 @@ void createDepth() {
 
 void createTextureImage() {
   int width, height, channels;
+  /*
   stbi_uc* pixels = stbi_load("texture.jpg", &width, &height, &channels, STBI_rgb_alpha);
   if (!pixels)
     throw std::runtime_error("failed to load texture image");
+  */
 
+  width = 1, height = 1;
   VkDeviceSize imageSize = width * height * 4;
 
   VkBuffer stagingBuffer;
@@ -1335,9 +1336,9 @@ void createTextureImage() {
 
   void *data;
   vkMapMemory(logicalDevice, stagingBufferMemory, 0, imageSize, 0, &data);
-  memcpy(data, pixels, static_cast<size_t>(imageSize));
+  //memcpy(data, pixels, static_cast<size_t>(imageSize));
   vkUnmapMemory(logicalDevice, stagingBufferMemory);
-  stbi_image_free(pixels);
+  //stbi_image_free(pixels);
 
   createImage(width, height,
               VK_FORMAT_R8G8B8A8_SRGB,

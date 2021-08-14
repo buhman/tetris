@@ -9,7 +9,8 @@ namespace tetris {
     TET_I,
     TET_J,
     TET_T,
-    TET_LAST
+    TET_LAST,
+    TET_LAST_COLOR
   };
 
   enum dir {
@@ -37,8 +38,8 @@ namespace tetris {
   };
 
   struct coord {
-    int u;
-    int v;
+    int u; // uint8_t
+    int v; // uint8_t
   };
 
   struct tetronimo {

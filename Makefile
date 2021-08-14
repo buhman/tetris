@@ -1,19 +1,36 @@
-all: a.out shader.frag.spv shader.vert.spv
+all: server
+#all: game shader.frag.spv shader.vert.spv
+
+MAKEFLAGS += --no-builtin-rules
+.SUFFIXES:
 
 include config.mk
 
 DEP = $(wildcard *.hpp)
-SRC = game.cpp tetris.cpp input.cpp stb_image.c
-OBJ = $(SRC:.cpp=.o)
+GAME_SRC = game.cpp tetris.cpp input.cpp
+GAME_OBJ = $(GAME_SRC:.cpp=.o)
+GAME_DEP = $(GAME_OBJ:%.o=%.d)
 
-%.o: %.cpp
-	g++ -g -Og -std=c++17 -c $<
+SERVER_SRC = server.cpp bswap.cpp
+SERVER_OBJ = $(SERVER_SRC:.cpp=.o)
+SERVER_DEP = $(SERVER_OBJ:%.o=%.d)
 
-a.out: $(OBJ) $(DEP)
-	g++ -g -Og -std=c++17 $(LDFLAGS) $(LIBS) $(OBJ) -o $@
+CXXFLAGS = -g -Og -std=c++20
 
-shader.frag.spv: shader.frag.glsl
-	glslangValidator shader.frag.glsl -V -o shader.frag.spv
+%.d: %.cpp
+	g++ $(CXXFLAGS) -MM $< -o $@
 
-shader.vert.spv: shader.vert.glsl
-	glslangValidator shader.vert.glsl -V -o shader.vert.spv
+-include $(SERVER_DEP)
+-include $(GAME_DEP)
+
+%.o: %.cpp %.d
+	g++ $(CXXFLAGS) -c $< -o $@
+
+game: $(GAME_OBJ) $(GAME_DEP)
+	g++ $(CXXFLAGS) $(LDFLAGS) $(LIBS) $(GAME_OBJ) -o $@
+
+server: $(SERVER_OBJ) $(SERVER_DEP)
+	g++ $(CXXFLAGS) $(SERVER_OBJ) -o $@
+
+%.spv: %.glsl
+	glslangValidator $< -V -o $@

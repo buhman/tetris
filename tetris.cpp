@@ -128,27 +128,24 @@ void next_piece(tetris::type t) {
   fall();
 }
 
+void fill(int u, int v) {
+  //if (u < 3 || u > 6) {
+  if (u != 4 && v > 10) {
+    board[u][v].empty = false;
+    board[u][v].color = TET_LAST;
+  } else {
+    board[u][v].empty = true;
+  }
+}
+
 void tetris::initBoard() {
   for (int u = 0; u < 10; u++) {
     for (int v = 0; v < 20; v++) {
-      board[u][v].empty = true;
+      fill(u, v);
     }
   }
 
   next_piece(TET_LAST);
-}
-
-void tetris::shiftDown() {
-  for (int u = 9; u >= 0; u--) {
-    for (int v = 19; v >= 0; v--) {
-      if (v == 0)
-        board[u][v].empty = true;
-      else {
-        board[u][v].color = board[u][v-1].color;
-        board[u][v].empty = board[u][v-1].empty;
-      }
-    }
-  }
 }
 
 void place() {
@@ -163,7 +160,7 @@ void place() {
   }
 }
 
-void clearLines() {
+void clear_lines() {
   uint32_t seen = 0;
   uint32_t rows = 0;
 
@@ -193,7 +190,7 @@ void clearLines() {
 
     for (int col = 0; col < 10; col++) {
       if ((row - off) <= 0 && off > 0)
-        board[col][row].empty = true;
+        fill(col, row);
       else {
         board[col][row].empty = board[col][row - off].empty;
         board[col][row].color = board[col][row - off].color;
@@ -210,7 +207,7 @@ void fall() {
       initBoard();
     } else {
       place();
-      clearLines();
+      clear_lines();
       next_piece(TET_LAST);
     }
   } else
@@ -272,7 +269,5 @@ void tetris::input(event ev) {
 }
 
 void tetris::tick() {
-  //shiftDown();
-  //
   fall();
 }
