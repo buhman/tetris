@@ -4,3 +4,5 @@
 *.d
 /game
 /server
+*~
+*.exe

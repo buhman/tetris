@@ -6,6 +6,12 @@
 #include <cassert>
 
 #ifdef _WIN32
+#include <winsock2.h>
+#include <in6addr.h>
+#include <ws2tcpip.h>
+#define close(x) closesocket(x)
+#define send(fd, buf, len, flags) send(fd, (const char *)buf, len, flags)
+#define recv(fd, buf, len, flags) recv(fd, (char *)buf, len, flags)
 #else
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -59,6 +65,9 @@ int reconnect()
   ret = connect(fd, (struct sockaddr*)&sa, (sizeof (struct sockaddr_in6)));
   if (ret < 0) {
     std::cerr << "connect: " << std::strerror(errno) << '\n';
+    #ifdef _WIN32
+    std::cerr << "WSAGetLastError: " << WSAGetLastError() << '\n';
+    #endif
     return -1;
   }
 

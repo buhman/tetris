@@ -1,4 +1,6 @@
+ifneq ($(OS),Windows_NT)
 all: server
+endif
 all: game shader.frag.spv shader.vert.spv
 
 MAKEFLAGS += --no-builtin-rules
@@ -28,7 +30,7 @@ CXX = g++
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 game: $(GAME_OBJ) $(GAME_DEP)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LIBS) $(GAME_OBJ) -o $@
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(GAME_OBJ) $(LIBS) -o $@
 
 server: $(SERVER_OBJ) $(SERVER_DEP)
 	$(CXX) $(CXXFLAGS) $(SERVER_OBJ) -o $@
