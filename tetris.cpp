@@ -7,9 +7,9 @@
 
 #include "tetris.hpp"
 
-constexpr int frame_count = 2;
+#include "client.hpp"
 
-std::vector<tetris::frame> tetris::frames;
+std::array<tetris::frame, tetris::frame_count> tetris::frames;
 
 tetris::coord tetris::offsets[tetris::tet::last][4][4] = {
   [tetris::tet::z] = {
@@ -62,10 +62,9 @@ static std::default_random_engine generator (seed);
 static void fill(tetris::cell& cell, int i, int j)
 {
   if (i < 2 || i > 7) {
-    cell.empty = false;
-    cell.color = static_cast<tetris::tet>(j % static_cast<int>(tetris::tet::last_color));
+    cell.color = static_cast<tetris::tet>(j % static_cast<int>(tetris::tet::empty));
   } else {
-    cell.empty = true;
+    cell.color = tetris::tet::empty;
   }
 }
 
@@ -80,7 +79,7 @@ void refill_bag(tetris::bag& bag)
 {
   if (bag.size() == 0) {
     tetris::bag::iterator it = bag.end();
-    for (int i = 0; i != tetris::tet::last; i++) {
+    for (int i = 0; i != tetris::tet::empty; i++) {
       tetris::tet t = static_cast<tetris::tet>(i);
       bag.insert(it, t);
     }
@@ -127,9 +126,8 @@ void tetris::reset_frame(tetris::frame& frame)
 
 void tetris::init()
 {
-  for (int i = 0; i < frame_count; i++) {
-    tetris::frame& f = frames.emplace_back();
-    if (i == 0)
-      reset_frame(f);
+  reset_frame(frames[0]);
+
+  for (int i = 0; i < tetris::frame_count; i++) {
   }
 }

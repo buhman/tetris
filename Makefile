@@ -1,4 +1,4 @@
-#all: server
+all: server
 all: game shader.frag.spv shader.vert.spv
 
 MAKEFLAGS += --no-builtin-rules
@@ -7,11 +7,11 @@ MAKEFLAGS += --no-builtin-rules
 include config.mk
 
 DEP = $(wildcard *.hpp)
-GAME_SRC = game.cpp tetris.cpp #input.cpp
+GAME_SRC = game.cpp tetris.cpp client.cpp bswap.cpp message.cpp #input.cpp
 GAME_OBJ = $(GAME_SRC:.cpp=.o)
 GAME_DEP = $(GAME_OBJ:%.o=%.d)
 
-SERVER_SRC = server.cpp bswap.cpp
+SERVER_SRC = server.cpp bswap.cpp message.cpp
 SERVER_OBJ = $(SERVER_SRC:.cpp=.o)
 SERVER_DEP = $(SERVER_OBJ:%.o=%.d)
 

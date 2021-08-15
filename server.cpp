@@ -3,7 +3,8 @@
 #include <iostream>
 #include <memory>
 #include <unordered_map>
-#include <span>
+#include <queue>
+#include <cassert>
 
 #include <arpa/inet.h>
 #include <sys/epoll.h>
@@ -11,10 +12,16 @@
 #include <unistd.h>
 
 #include "bswap.hpp"
+#include "server.hpp"
+#include "message.hpp"
+
+static std::array<tetris::frame, tetris::frame_count> frames;
+
+static std::unordered_map<int, poll_action> clients;
 
 //
 
-static void assert(int ret, const char* s)
+static void passert(int ret, const char* s)
 {
   if (ret < 0) {
     std::cerr << s << ": " << std::strerror(errno) << '\n';
@@ -28,12 +35,12 @@ static int open_port(uint16_t port)
   int fd;
 
   ret = ::socket(AF_INET6, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
-  assert(ret, "socket");
+  passert(ret, "socket");
   fd = ret;
 
   int opt = 1;
   ret = ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, (sizeof (int)));
-  assert(ret, "setsockopt: SO_REUSEADDR");
+  passert(ret, "setsockopt: SO_REUSEADDR");
 
   struct sockaddr_in6 sockaddr = {
     .sin6_family = AF_INET6,
@@ -42,114 +49,143 @@ static int open_port(uint16_t port)
   };
 
   ret = ::bind(fd, (struct sockaddr *)&sockaddr, (sizeof (struct sockaddr_in6)));
-  assert(ret, "bind");
+  passert(ret, "bind");
 
   ret  = ::listen(fd, 1024);
-  assert(ret, "listen");
+  passert(ret, "listen");
 
   socklen_t socklen = (sizeof (struct sockaddr_in6));
   ret = ::getsockname(fd, (struct sockaddr *)&sockaddr, &socklen);
-  assert(ret, "getsockname");
+  passert(ret, "getsockname");
 
   std::cerr << "listening on port: " << ntohs(sockaddr.sin6_port) << '\n';
 
   return fd;
 }
 
-static void epoll_add(const int epoll_fd, uint32_t events, const int fd, const int ix)
+static void epoll_add(const int epoll_fd, const int fd, uint32_t events)
 {
   struct epoll_event ev = {
     .events = events,
-    .data = { .fd=ix }
+    .data = { .fd=fd }
   };
 
   int ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &ev);
-  assert(ret, "epoll_ctl: EPOLL_CTL_ADD");
+  passert(ret, "epoll_ctl: EPOLL_CTL_ADD");
 }
 
-constexpr unsigned int buf_size = 65536;
-
-struct buf_index
+static bool handle_send(poll_action& action)
 {
-  std::array<uint8_t, buf_size> buf;
-  std::span<uint8_t> span;
-};
+  std::cerr << "handle_send\n";
 
-struct poll_action
-{
-  int fd;
-  enum action { accept, send_recv } type;
-  buf_index send;
-  buf_index recv;
-
-  poll_action(const int epoll_fd, const int fd, const action type)
-    : fd (fd)
-    , type (type)
-  {
-    recv.span = {recv.buf.begin(), recv.buf.size()};
-    send.span = {send.buf.begin(), send.buf.size()};
-
-    switch (type) {
-    case accept:
-      epoll_add(epoll_fd, EPOLLIN | EPOLLET, fd, fd);
-      break;
-    case send_recv:
-      epoll_add(epoll_fd, EPOLLIN | EPOLLOUT | EPOLLET, fd, fd);
-      break;
+  while (!action.queue.empty() || action.send.buf_ix) {
+    uint16_t buf_len;
+    if (action.send.buf_ix) {
+      buf_len = action.send.buf_ix;
+    } else {
+      auto [header, next] = action.queue.front();
+      buf_len = message::encode(header, next, action.send.buf);
     }
-  }
-};
-
-static void handle_send(poll_action& action)
-{
-}
-
-static void handle_recv(poll_action& action)
-{
-  while (1) {
-    std::cerr << "fd " << action.fd << '\n';
-    ssize_t len = recv(action.fd, action.recv.span.data(), action.recv.span.size(), 0);
+    ssize_t len = send(action.fd, action.send.buf, buf_len, 0);
+    std::cerr << "send: " << len << '\n';
     if (len < 0) {
       if (errno == EAGAIN || errno == EWOULDBLOCK)
-        return;
-      else
-        throw "recv";
-    }
-    if (len == 0) {
-      std::cerr << action.recv.span.size() << ' ';
-      throw "eof";
-    }
+        return false; // keep
+      else {
+        std::cerr << "recv: " << action.fd << ": " << std::strerror(errno) << '\n';
+        return true; // remove
+      }
+    } else if (len == 0)
+      return true; // remove
 
-    std::span<uint8_t> span = {action.recv.buf.data(), action.recv.span.data() + len};
+    if (!action.send.buf_ix)
+      action.queue.pop();
 
-    if (span.size() >= sizeof (uint16_t)) {
-      uint16_t frame_size = *reinterpret_cast<uint16_t*>(span.data());
-      frame_size = bswap::ntoh(frame_size);
-      std::cerr << "frame size: " << frame_size << ' ';
-      if (span.size() - sizeof (uint16_t) < frame_size) {
-        action.recv.span = {action.recv.span.data() + len, action.recv.span.size() - len};
-        std::cerr << "partial; rem: " << action.recv.span.size() << '\n';
-        continue;
+    action.send.buf_ix = buf_len - len;
+    if (len < buf_len) {
+      std::cerr << "send memmove: " << action.send.buf_ix << '\n';
+      memmove(action.send.buf, action.send.buf + len, action.send.buf_ix);
+    }
+  }
+
+  return false; // keep
+}
+
+static void handle_recv_message(poll_action& action, message::frame_header_t& header, tetris::field& field)
+{
+  action.queue.push(std::pair{header, message::next_t{field}});
+}
+
+static size_t handle_recv_frame(poll_action& action, uint8_t *bufi, size_t len)
+{
+  if (len < message::frame_header::size)
+    return 0;
+
+  message::frame_header_t header = message::frame_header::decode(bufi);
+  bufi += message::frame_header::size;
+
+  std::cerr << "next_length: " << header.next_length;
+  if (len < header.next_length) {
+    std::cerr << " incomplete\n";
+    return 0;
+  }
+  std::cerr << " complete\n";
+
+  switch (header.type) {
+  case message::type_t::_field:
+    assert(header.next_length == message::field::size);
+    assert(header.side < tetris::frame_count);
+
+    message::field::decode(bufi, frames[header.side].field);
+    handle_recv_message(action, header, frames[header.side].field);
+    break;
+  default:
+    std::cerr << "unhandled frame type " << header.type << '\n';
+    break;
+  }
+
+  return message::frame_header::size + header.next_length;
+}
+
+static bool handle_recv(poll_action& action)
+{
+  while (true) {
+    ssize_t len = recv(action.fd, action.recv.buf + action.recv.buf_ix, buf_size - action.recv.buf_ix, 0);
+    if (len < 0) {
+      if (errno == EAGAIN || errno == EWOULDBLOCK)
+        return false; // keep
+      else {
+        std::cerr << "recv: " << action.fd << ": " << std::strerror(errno) << '\n';
+        return true; // remove
+      }
+    } else if (len == 0)
+      return true; // remove
+
+    uint8_t* bufi = action.recv.buf;
+    while (true) {
+      size_t offset = handle_recv_frame(action, bufi, len);
+      if (offset == 0) {
+        break; // bufi does not contain a frame
       } else {
-        uint32_t f = *reinterpret_cast<uint32_t*>(span.data() + sizeof (uint16_t));
-        f = bswap::ntoh(f);
-        action.recv.span = {action.recv.buf.begin(), action.recv.buf.size()};
-        std::cerr << *reinterpret_cast<float*>(&f) << " complete\n";
+        len -= offset;
+        bufi += offset;
       }
     }
+    std::cerr << "recv memmove: " << len << '\n';
+    memmove(action.recv.buf, bufi, len);
+    action.recv.buf_ix = len;
   }
 }
 
 void foo()
 {
   int epoll_fd = epoll_create1(EPOLL_CLOEXEC);
-  assert(epoll_fd, "epoll_create1");
-
-  std::unordered_map<int, poll_action> clients;
+  passert(epoll_fd, "epoll_create1");
 
   auto listen_fd = open_port(5000);
-  auto [it, ok] = clients.try_emplace(listen_fd, epoll_fd, listen_fd, poll_action::accept);
+  auto [it, ok] = clients.try_emplace(listen_fd, listen_fd, poll_action::accept);
   if (!ok) throw "clients.try_emplace";
+  epoll_add(epoll_fd, listen_fd, EPOLLIN | EPOLLET);
 
   std::array<struct epoll_event, 16> events;
 
@@ -157,28 +193,50 @@ void foo()
     const int ready_count = epoll_wait(epoll_fd, events.data(), events.size(), -1);
     if (ready_count < 0 && errno == EINTR)
       continue;
-    assert(ready_count, "epoll_wait");
+    passert(ready_count, "epoll_wait");
 
     for (int i = 0; i < ready_count; i++) {
       auto client_it = clients.find(events[i].data.fd);
-
       if (client_it == clients.end()) throw "clients.find";
-      switch (client_it->second.type) {
+      poll_action& action = client_it->second;
+
+      switch (action.type) {
       case poll_action::accept:
         {
-          int ret = accept4(client_it->second.fd, NULL, NULL, SOCK_NONBLOCK);
-          if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
+          int accept_fd = accept4(action.fd, NULL, NULL, SOCK_NONBLOCK);
+          if (accept_fd == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
             break;
-          assert(ret, "accept4");
+          passert(accept_fd, "accept4");
 
-          auto [accept_it, ok] = clients.try_emplace(ret, epoll_fd, ret, poll_action::send_recv);
+          auto [_accept_it, ok] = clients.try_emplace(accept_fd, accept_fd, poll_action::send_recv);
           if (!ok) throw "clients.try_emplace";
+          epoll_add(epoll_fd, accept_fd, EPOLLIN | EPOLLONESHOT);
         }
         break;
       case poll_action::send_recv:
         {
-          handle_recv(client_it->second);
-          std::cerr << "sr\n";
+          bool erase = false;
+          if (events[i].events & EPOLLIN)
+            erase |= handle_recv(action);
+          if (events[i].events & EPOLLOUT)
+            erase |= handle_send(action);
+
+          if (erase) {
+            int ret = close(action.fd);
+            if (ret < 0)
+              std::cerr << "close: " << action.fd << ": " << std::strerror(errno) << '\n';
+            std::cerr << "clients.erase: " << action.fd << '\n';
+            clients.erase(action.fd);
+          } else {
+            uint32_t epollout = (action.queue.empty() && !action.send.buf_ix ) ? 0 : EPOLLOUT;
+            std::cerr << "epo " << epollout << '\n';
+            struct epoll_event ev = {
+              .events = EPOLLIN | epollout | EPOLLONESHOT,
+              .data = { .fd=action.fd }
+            };
+            int ret = epoll_ctl(epoll_fd, EPOLL_CTL_MOD, action.fd, &ev);
+            passert(ret, "epoll_ctl: EPOLL_CTL_MOD");
+          }
         }
         break;
       default:

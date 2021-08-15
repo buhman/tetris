@@ -10,5 +10,6 @@ glm::vec3 cellColors[tetris::tet::last_color] = {
   [tetris::tet::i] = glm::vec3(0.192f, 0.780f, 0.937f),
   [tetris::tet::j] = glm::vec3(0.353f, 0.396f, 0.678f),
   [tetris::tet::t] = glm::vec3(0.678f, 0.302f, 0.612f),
+  [tetris::tet::empty] = glm::vec3(0.0f, 0.0f, 0.0f),
   [tetris::tet::last] = glm::vec3(0.3f, 0.3f, 0.3f),
 };

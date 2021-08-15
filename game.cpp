@@ -28,6 +28,7 @@
 #include "game.hpp"
 #include "input.hpp"
 #include "tetris.hpp"
+#include "client.hpp"
 
 static GLFWwindow * window;
 static VkInstance instance;
@@ -196,9 +197,11 @@ void createInstance() {
   vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
   std::vector<VkExtensionProperties> extensions(extensionCount);
   vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+  /*
   std::cerr << "available instance extensions:\n";
   for (const auto& extension : extensions)
     std::cerr << '\t' << extension.extensionName << '\n';
+  */
 
   VkApplicationInfo appInfo{};
   appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -221,9 +224,11 @@ void createInstance() {
   instanceExtensions[1] = "VK_KHR_xlib_surface";
   #endif
 
+  /*
   std::cerr << "requested instance extensions:\n";
   for (const auto& extension : instanceExtensions)
     std::cerr << '\t' << extension << '\n';
+  */
 
   createInfo.enabledExtensionCount = instanceExtensions.size();
   createInfo.ppEnabledExtensionNames = instanceExtensions.data();
@@ -1491,10 +1496,7 @@ void updateUniformBuffer(uint32_t currentImage) {
         _ubo* _cell = (_ubo*)(((uint64_t)uboModels + (uboCellIndex * uniformDynamicAlignment)));
         _cell->model = glm::translate(glm::mat4(1.0f), glm::vec3((float)u, (float)v, 0.0f));
         _cell->view = _ndc * _frame[frameIndex] * _field;
-        if (cell.empty)
-          _cell->color = glm::vec3(0.0f, 0.0f, 0.0f);
-        else
-          _cell->color = cellColors[cell.color];
+        _cell->color = cellColors[cell.color];
       }
     }
 
@@ -1751,7 +1753,10 @@ void cleanup() {
 }
 
 int main() {
+  client::init();
   tetris::init();
+
+  client::event_field_state(tetris::frames[0].field, message::side_t::one);
 
   initWindow();
   //input::init(window);

@@ -3,6 +3,7 @@
 #include <vector>
 #include <array>
 #include <set>
+#include <mutex>
 
 namespace tetris {
   enum tet {
@@ -13,6 +14,7 @@ namespace tetris {
     i,
     j,
     t,
+    empty,
     last,
     last_color
   };
@@ -38,7 +40,6 @@ namespace tetris {
 
   struct cell {
     tetris::tet color;
-    bool empty;
   };
 
   struct coord {
@@ -68,9 +69,16 @@ namespace tetris {
     tetris::queue queue;
     tetris::piece piece;
     tetris::tet swap;
+    //std::mutex lock;
+
+    frame()
+    {
+    }
   };
 
-  extern std::vector<frame> frames;
+  constexpr int frame_count = 2;
+
+  extern std::array<frame, frame_count> frames;
 
   void init_field(tetris::field& field);
 

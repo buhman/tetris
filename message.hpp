@@ -1,25 +1,48 @@
-#include "tetris.hpp"
-
 #pragma once
 
+#include <variant>
+
+#include "tetris.hpp"
+
 namespace message {
-  enum type {
-    new_piece,
-    piece_move,
-    piece_place
+  enum type_t {
+    _field,
   };
 
-  struct new_piece {
-    tetris::type type;
+  enum side_t {
+    zero = 0,
+    one = 1
   };
 
-  struct piece_move {
-    tetris::coord coord;
-    tetris::dir dir;
+  using next_t = std::variant<tetris::field, std::monostate>;
+
+  // frame_header
+
+  struct frame_header_t {
+    type_t type;
+    side_t side;
+    uint16_t next_length;
   };
 
-  struct piece_place {
-    tetris::coord coord;
-    tetris::dir dir;
-  };
+  namespace frame_header {
+    frame_header_t decode(const std::uint8_t * buf);
+    void encode(const frame_header_t& header, std::uint8_t * buf);
+
+    constexpr uint16_t size = (sizeof (uint8_t))
+                            + (sizeof (uint8_t))
+                            + (sizeof (uint16_t));
+  }
+
+  // field
+
+  namespace field {
+    void decode(const std::uint8_t * buf, tetris::field& field);
+    void encode(const tetris::field& field, std::uint8_t * buf);
+
+    constexpr uint16_t size = (sizeof (uint8_t)) * tetris::rows * tetris::columns;
+  }
+
+  //
+
+  size_t encode(const frame_header_t& header, const next_t& next, std::uint8_t * buf);
 }
