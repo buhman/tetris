@@ -9,6 +9,7 @@
 
 #include "client.hpp"
 
+tetris::side_t tetris::this_side = tetris::side_t::none;
 std::array<tetris::frame, tetris::frame_count> tetris::frames;
 
 tetris::coord tetris::offsets[tetris::tet::last][4][4] = {
@@ -59,16 +60,18 @@ tetris::coord tetris::offsets[tetris::tet::last][4][4] = {
 static auto seed = std::chrono::system_clock::now().time_since_epoch().count();
 static std::default_random_engine generator (seed);
 
+std::uniform_int_distribution<int> tet_distribution(0, static_cast<int>(tetris::tet::empty) - 1);
+
 static void fill(tetris::cell& cell, int i, int j)
 {
   if (i < 2 || i > 7) {
-    cell.color = static_cast<tetris::tet>(j % static_cast<int>(tetris::tet::empty));
+    cell.color = static_cast<tetris::tet>(tet_distribution(generator));
   } else {
     cell.color = tetris::tet::empty;
   }
 }
 
-void tetris::init_field(tetris::field& field)
+static void reset_field(tetris::field& field)
 {
   for (int i = 0; i < tetris::columns; i++)
     for (int j = 0; j < tetris::rows; j++)
@@ -113,10 +116,10 @@ void next_piece(tetris::piece& p, tetris::tet t)
     p.pos.v = 20;
 }
 
-
-void tetris::reset_frame(tetris::frame& frame)
+void tetris::event_reset_frame(tetris::side_t side)
 {
-  tetris::init_field(frame.field);
+  tetris::frame& frame = frames[side];
+  reset_field(frame.field);
   next_piece(frame.piece, next_tet(frame));
   // bag
   // queue
@@ -126,8 +129,6 @@ void tetris::reset_frame(tetris::frame& frame)
 
 void tetris::init()
 {
-  reset_frame(frames[0]);
-
   for (int i = 0; i < tetris::frame_count; i++) {
   }
 }

@@ -20,6 +20,7 @@ struct poll_action
   enum action { accept, send_recv } type;
   buf_index send;
   buf_index recv;
+  tetris::side_t side;
 
   std::queue<queue_item> queue;
 
@@ -29,5 +30,6 @@ struct poll_action
   {
     send.buf_ix = 0;
     recv.buf_ix = 0;
+    side = tetris::side_t::none;
   }
 };

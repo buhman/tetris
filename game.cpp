@@ -4,7 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <optional>
-#include <set>
+#include <unordered_set>
 #include <thread>
 #include <stdexcept>
 #include <vector>
@@ -266,7 +266,7 @@ bool checkDeviceFeatures(VkPhysicalDevice device) {
   std::vector<VkExtensionProperties> availableExtensions(extensionCount);
   vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
 
-  std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
+  std::unordered_set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
 
   for (const auto& extension : availableExtensions) {
     requiredExtensions.erase(extension.extensionName);
@@ -1753,10 +1753,8 @@ void cleanup() {
 }
 
 int main() {
-  client::init();
   tetris::init();
-
-  client::event_field_state(tetris::frames[0].field, message::side_t::one);
+  client::init();
 
   initWindow();
   //input::init(window);

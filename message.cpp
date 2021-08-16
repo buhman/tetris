@@ -17,7 +17,7 @@ namespace frame_header {
   {
     return {
       static_cast<message::type_t>(*((uint8_t *)(buf + 0))),
-      static_cast<message::side_t>(*((uint8_t *)(buf + 1))),
+      static_cast<tetris::side_t>(*((uint8_t *)(buf + 1))),
       bswap::ntoh(*((uint16_t *)(buf + 2))), // next_length
     };
   }
@@ -63,6 +63,9 @@ size_t encode(const frame_header_t& header, const next_t& next, std::uint8_t * b
     assert(header.next_length == message::field::size);
     message::field::encode(std::get<tetris::field>(next), buf);
     return message::frame_header::size + message::field::size;
+  case message::type_t::_side:
+    assert(header.next_length == 0);
+    return message::frame_header::size;
   default:
     assert(false);
   }

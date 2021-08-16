@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <array>
-#include <set>
+#include <unordered_set>
 #include <mutex>
 
 namespace tetris {
@@ -17,6 +17,12 @@ namespace tetris {
     empty,
     last,
     last_color
+  };
+
+  enum side_t {
+    zero = 0,
+    one = 1,
+    none
   };
 
   enum dir {
@@ -60,7 +66,7 @@ namespace tetris {
   constexpr int rows = 40;
   constexpr int columns = 10;
   typedef std::array<std::array<cell, rows>, columns> field;
-  typedef std::set<tetris::tet> bag;
+  typedef std::unordered_set<tetris::tet> bag;
   typedef std::vector<tetris::tet> queue;
 
   struct frame {
@@ -70,19 +76,14 @@ namespace tetris {
     tetris::piece piece;
     tetris::tet swap;
     //std::mutex lock;
-
-    frame()
-    {
-    }
   };
 
   constexpr int frame_count = 2;
 
   extern std::array<frame, frame_count> frames;
+  extern tetris::side_t this_side;
 
-  void init_field(tetris::field& field);
-
-  void reset_frame(tetris::frame& frame);
+  void event_reset_frame(tetris::side_t side);
 
   void init();
 }

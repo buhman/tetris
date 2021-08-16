@@ -7,20 +7,16 @@
 namespace message {
   enum type_t {
     _field,
+    _side,
   };
 
-  enum side_t {
-    zero = 0,
-    one = 1
-  };
-
-  using next_t = std::variant<tetris::field, std::monostate>;
+  using next_t = std::variant<std::monostate, tetris::field>;
 
   // frame_header
 
   struct frame_header_t {
     type_t type;
-    side_t side;
+    tetris::side_t side;
     uint16_t next_length;
   };
 
