@@ -3,7 +3,7 @@
 #include "tetris.hpp"
 
 namespace client {
+  void input(tetris::event ev);
+  void tick();
   void init();
-
-  void event_field_state(tetris::field& field, tetris::side_t side);
 }

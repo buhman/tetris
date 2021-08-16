@@ -9,7 +9,7 @@ MAKEFLAGS += --no-builtin-rules -j$(shell nproc)
 include config.mk
 
 DEP = $(wildcard *.hpp)
-GAME_SRC = game.cpp tetris.cpp client.cpp bswap.cpp message.cpp #input.cpp
+GAME_SRC = game.cpp tetris.cpp client.cpp bswap.cpp message.cpp input.cpp
 GAME_OBJ = $(GAME_SRC:.cpp=.o)
 GAME_DEP = $(GAME_OBJ:%.o=%.d)
 

@@ -133,18 +133,81 @@ namespace queue_send {
     header.next_length = message::field::size;
 
     action.queue.push(std::pair{header, message::next_t{field}});
+    _epoll_mod(action.fd, EPOLLOUT);
+  }
+
+  static void move(poll_action& action, tetris::side_t piece_side, tetris::piece& piece)
+  {
+    message::frame_header_t header;
+    header.type = message::type_t::_move;
+    header.side = piece_side;
+    header.next_length = message::piece::size;
+
+    action.queue.push(std::pair{header, message::next_t{piece}});
+    _epoll_mod(action.fd, EPOLLOUT);
+  }
+
+  static void drop(poll_action& action, tetris::side_t piece_side, tetris::piece& piece)
+  {
+    message::frame_header_t header;
+    header.type = message::type_t::_drop;
+    header.side = piece_side;
+    header.next_length = message::piece::size;
+
+    action.queue.push(std::pair{header, message::next_t{piece}});
+    _epoll_mod(action.fd, EPOLLOUT);
   }
 }
 
-static void broadcast_field(tetris::side_t origin)
-{
-  for (auto& client : clients) {
-    if (client.second.side == origin || client.second.type == poll_action::accept)
-      continue;
-    std::cerr << "broadcast field " << origin << " to fd " << client.second.fd << '\n';
-    queue_send::field(client.second, origin, tetris::frames[origin].field);
-    assert(!client.second.queue.empty());
-    _epoll_mod(client.second.fd, EPOLLOUT);
+namespace broadcast {
+  static void field(tetris::side_t origin)
+  {
+    for (auto& client : clients) {
+      if (client.second.side == origin || client.second.type == poll_action::accept)
+        continue;
+      std::cerr << "broadcast field " << static_cast<int>(origin) << " to fd " << client.second.fd << '\n';
+      queue_send::field(client.second, origin, tetris::frames[static_cast<int>(origin)].field);
+    }
+  }
+
+  static void move(tetris::side_t origin)
+  {
+    for (auto& client : clients) {
+      if (client.second.side == origin || client.second.type == poll_action::accept)
+        continue;
+      std::cerr << "broadcast move " << static_cast<int>(origin) << " to fd " << client.second.fd << '\n';
+      queue_send::move(client.second, origin, tetris::frames[static_cast<int>(origin)].piece);
+    }
+  }
+
+  static void drop(tetris::side_t origin)
+  {
+    for (auto& client : clients) {
+      if (client.second.side == origin || client.second.type == poll_action::accept)
+        continue;
+      std::cerr << "broadcast drop " << static_cast<int>(origin) << " to fd " << client.second.fd << '\n';
+      queue_send::drop(client.second, origin, tetris::frames[static_cast<int>(origin)].piece);
+    }
+  }
+}
+
+namespace dump {
+  static void fields(poll_action& action)
+  {
+    for (int i = 0; i < tetris::frame_count; i++) {
+      if (static_cast<int>(action.side) == i)
+        continue;
+      queue_send::field(action, static_cast<tetris::side_t>(i), tetris::frames[i].field);
+    }
+  }
+
+  static void moves(poll_action& action)
+  {
+    for (int i = 0; i < tetris::frame_count; i++) {
+      if (static_cast<int>(action.side) == i)
+        continue;
+      queue_send::move(action, static_cast<tetris::side_t>(i), tetris::frames[i].piece);
+    }
   }
 }
 
@@ -156,20 +219,27 @@ static size_t handle_recv_frame(poll_action& action, uint8_t *bufi, size_t len)
   message::frame_header_t header = message::frame_header::decode(bufi);
   bufi += message::frame_header::size;
 
-  std::cerr << "next_length: " << header.next_length;
   if (len < header.next_length) {
-    std::cerr << " incomplete\n";
     return 0;
   }
-  std::cerr << " complete\n";
 
+  assert(static_cast<int>(header.side) < tetris::frame_count);
   switch (header.type) {
   case message::type_t::_field:
     assert(header.next_length == message::field::size);
-    assert(header.side < tetris::frame_count);
-
-    message::field::decode(bufi, tetris::frames[header.side].field);
-    broadcast_field(header.side);
+    message::field::decode(bufi, tetris::frames[(int)header.side].field);
+    broadcast::field(header.side);
+    break;
+  case message::type_t::_move:
+    assert(header.next_length == message::piece::size);
+    message::piece::decode(bufi, tetris::frames[(int)header.side].piece);
+    broadcast::move(header.side);
+    break;
+  case message::type_t::_drop:
+    assert(header.next_length == message::piece::size);
+    message::piece::decode(bufi, tetris::frames[(int)header.side].piece);
+    tetris::_place(tetris::frames[(int)header.side].field, tetris::frames[(int)header.side].piece);
+    broadcast::drop(header.side);
     break;
   default:
     std::cerr << "unhandled frame type " << header.type << '\n';
@@ -203,18 +273,9 @@ static bool handle_recv(poll_action& action)
         bufi += offset;
       }
     }
-    std::cerr << "recv memmove: " << len << '\n';
+    //std::cerr << "recv memmove: " << len << '\n';
     memmove(action.recv.buf, bufi, len);
     action.recv.buf_ix = len;
-  }
-}
-
-static void dump_fields(poll_action& action)
-{
-  for (int i = 0; i < tetris::frame_count; i++) {
-    if (action.side == i)
-      continue;
-    queue_send::field(action, static_cast<tetris::side_t>(i), tetris::frames[i].field);
   }
 }
 
@@ -222,7 +283,7 @@ static void allocate_side(poll_action& action)
 {
   if (!sides.empty()) {
     action.side = *sides.begin();
-    std::cerr << "fd " << action.fd << " side " << action.side << '\n';
+    std::cerr << "fd " << action.fd << " side " << static_cast<int>(action.side) << '\n';
     sides.erase(sides.begin());
     message::frame_header_t header{message::type_t::_side, action.side, 0};
     action.queue.push(std::pair{header, message::next_t{}});
@@ -268,8 +329,9 @@ void foo()
 
             // send _side message
             allocate_side(accept_it->second);
-            std::cerr << "accept " << accept_fd << " side " << accept_it->second.side << '\n';
-            dump_fields(accept_it->second);
+            std::cerr << "accept " << accept_fd << " side " << static_cast<int>(accept_it->second.side) << '\n';
+            dump::fields(accept_it->second);
+            dump::moves(accept_it->second);
           }
         }
         break;

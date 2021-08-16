@@ -8,9 +8,11 @@ namespace message {
   enum type_t {
     _field,
     _side,
+    _move,
+    _drop,
   };
 
-  using next_t = std::variant<std::monostate, tetris::field>;
+  using next_t = std::variant<std::monostate, tetris::field, tetris::piece>;
 
   // frame_header
 
@@ -36,6 +38,18 @@ namespace message {
     void encode(const tetris::field& field, std::uint8_t * buf);
 
     constexpr uint16_t size = (sizeof (uint8_t)) * tetris::rows * tetris::columns;
+  }
+
+  // piece
+
+  namespace piece {
+    void decode(const std::uint8_t * buf, tetris::piece& piece);
+    void encode(const tetris::piece& piece, std::uint8_t * buf);
+
+    constexpr uint16_t size = (sizeof (uint8_t))     // tet
+                            + (sizeof (uint8_t))     // facing
+                            + (sizeof (int8_t)) * 2 // pos
+                            + (sizeof (uint8_t));    // drop_row
   }
 
   //

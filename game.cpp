@@ -1496,15 +1496,15 @@ void updateUniformBuffer(uint32_t currentImage) {
         _ubo* _cell = (_ubo*)(((uint64_t)uboModels + (uboCellIndex * uniformDynamicAlignment)));
         _cell->model = glm::translate(glm::mat4(1.0f), glm::vec3((float)u, (float)v, 0.0f));
         _cell->view = _ndc * _frame[frameIndex] * _field;
-        _cell->color = cellColors[cell.color];
+        _cell->color = cellColors[static_cast<int>(cell.color)];
       }
     }
 
     for (int i = 0; i < 4; i++) {
-      tetris::coord off = tetris::offsets[frame.piece.tet][frame.piece.facing][i];
+      tetris::coord off = tetris::offsets[static_cast<int>(frame.piece.tet)][static_cast<int>(frame.piece.facing)][i];
       const int uboCellIndex = getCellIndex(frame.piece.pos.u + off.u, frame.piece.pos.v + off.v, frameIndex);
       _ubo* _cell = (_ubo*)(((uint64_t)uboModels + (uboCellIndex * uniformDynamicAlignment)));
-      _cell->color = cellColors[frame.piece.tet];
+      _cell->color = cellColors[static_cast<int>(frame.piece.tet)];
     }
 
     frameIndex++;
@@ -1634,7 +1634,7 @@ void loop() {
     auto start = clock_::now();
 
     glfwPollEvents();
-    //input::poll_gamepads();
+    input::poll_gamepads();
     drawFrame();
 
     float time;
@@ -1642,7 +1642,7 @@ void loop() {
     time = duration(currentTime - tickTime).count();
     if (time > 0.5f) {
       tickTime = currentTime;
-      //tetris::tick();
+      client::tick();
     }
 
     //
@@ -1757,7 +1757,7 @@ int main() {
   client::init();
 
   initWindow();
-  //input::init(window);
+  input::init(window);
   initVulkan();
   loop();
   cleanup();

@@ -7,36 +7,37 @@
 
 #include "input.hpp"
 #include "tetris.hpp"
+#include "client.hpp"
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
   if (action == GLFW_PRESS) {
     switch (key) {
     case GLFW_KEY_LEFT:
     case GLFW_KEY_J:
-      tetris::input(tetris::EVENT_LEFT);
+      client::input(tetris::event::left);
       break;
     case GLFW_KEY_RIGHT:
     case GLFW_KEY_L:
-      tetris::input(tetris::EVENT_RIGHT);
+      client::input(tetris::event::right);
       break;
     case GLFW_KEY_DOWN:
     case GLFW_KEY_K:
-      tetris::input(tetris::EVENT_DOWN);
+      client::input(tetris::event::down);
       break;
     case GLFW_KEY_SPACE:
-      tetris::input(tetris::EVENT_DROP);
+      client::input(tetris::event::drop);
       break;
     case GLFW_KEY_S:
-      tetris::input(tetris::EVENT_SPIN_LEFT);
+      client::input(tetris::event::spin_ccw);
       break;
     case GLFW_KEY_F:
-      tetris::input(tetris::EVENT_SPIN_RIGHT);
+      client::input(tetris::event::spin_cw);
       break;
     case GLFW_KEY_E:
-      tetris::input(tetris::EVENT_SPIN_180);
+      client::input(tetris::event::spin_180);
       break;
     case GLFW_KEY_D:
-      tetris::input(tetris::EVENT_SWAP);
+      client::input(tetris::event::swap);
       break;
     default:
       break;
@@ -55,28 +56,28 @@ static state s[GLFW_JOYSTICK_LAST];
 void handle_button(int button) {
   switch (button) {
   case GLFW_GAMEPAD_BUTTON_A: // X
-    tetris::input(tetris::EVENT_DROP);
+    client::input(tetris::event::drop);
     break;
   case GLFW_GAMEPAD_BUTTON_B: // O
-    tetris::input(tetris::EVENT_SPIN_RIGHT);
+    client::input(tetris::event::spin_cw);
     break;
   case GLFW_GAMEPAD_BUTTON_X: // square
-    tetris::input(tetris::EVENT_SPIN_LEFT);
+    client::input(tetris::event::spin_ccw);
     break;
   case GLFW_GAMEPAD_BUTTON_Y: // triangle
-    tetris::input(tetris::EVENT_SPIN_180);
+    client::input(tetris::event::spin_180);
     break;
   case GLFW_GAMEPAD_BUTTON_DPAD_UP:
-    tetris::input(tetris::EVENT_SWAP);
+    client::input(tetris::event::swap);
     break;
   case GLFW_GAMEPAD_BUTTON_DPAD_RIGHT:
-    tetris::input(tetris::EVENT_RIGHT);
+    client::input(tetris::event::right);
     break;
   case GLFW_GAMEPAD_BUTTON_DPAD_DOWN:
-    tetris::input(tetris::EVENT_DOWN);
+    client::input(tetris::event::down);
     break;
   case GLFW_GAMEPAD_BUTTON_DPAD_LEFT:
-    tetris::input(tetris::EVENT_LEFT);
+    client::input(tetris::event::left);
     break;
   default:
     break;

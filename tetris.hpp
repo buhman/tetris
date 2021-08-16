@@ -3,10 +3,9 @@
 #include <vector>
 #include <array>
 #include <unordered_set>
-#include <mutex>
 
 namespace tetris {
-  enum tet {
+  enum class tet {
     z,
     l,
     o,
@@ -19,29 +18,29 @@ namespace tetris {
     last_color
   };
 
-  enum side_t {
+  enum class side_t {
     zero = 0,
     one = 1,
     none
   };
 
-  enum dir {
-    DIR_0,
-    DIR_1,
-    DIR_2,
-    DIR_3,
-    DIR_LAST
+  enum class dir {
+    up,
+    right,
+    down,
+    left,
+    last
   };
 
-  enum event {
-    EVENT_LEFT,
-    EVENT_RIGHT,
-    EVENT_DOWN,
-    EVENT_DROP,
-    EVENT_SPIN_LEFT,
-    EVENT_SPIN_RIGHT,
-    EVENT_SPIN_180,
-    EVENT_SWAP
+  enum class event {
+    left,
+    right,
+    down,
+    drop,
+    spin_cw,
+    spin_ccw,
+    spin_180,
+    swap
   };
 
   struct cell {
@@ -49,19 +48,19 @@ namespace tetris {
   };
 
   struct coord {
-    int u; // uint8_t
-    int v; // uint8_t
+    int u;
+    int v;
   };
 
   struct piece {
     tetris::tet tet;
-    tetris::coord pos;
     tetris::dir facing;
+    tetris::coord pos;
     bool swapped;
     int drop_row;
   };
 
-  extern coord offsets[tetris::tet::last][4][4];
+  extern coord offsets[static_cast<int>(tetris::tet::last)][4][4];
 
   constexpr int rows = 40;
   constexpr int columns = 10;
@@ -75,7 +74,6 @@ namespace tetris {
     tetris::queue queue;
     tetris::piece piece;
     tetris::tet swap;
-    //std::mutex lock;
   };
 
   constexpr int frame_count = 2;
@@ -85,5 +83,9 @@ namespace tetris {
 
   void event_reset_frame(tetris::side_t side);
 
+  void _place(tetris::field& field, tetris::piece& piece);
+  void drop();
+  void next_piece();
+  bool move(tetris::coord offset, int rotation);
   void init();
 }
