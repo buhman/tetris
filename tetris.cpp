@@ -141,7 +141,7 @@ void tetris::swap()
   THIS_FRAME.swapped = true;
   tetris::tet swap = THIS_FRAME.swap;
   THIS_FRAME.swap = THIS_FRAME.piece.tet;
-  if (THIS_FRAME.swap != tetris::tet::empty)
+  if (swap == tetris::tet::empty)
     _next_piece(THIS_FRAME.piece, next_tet(THIS_FRAME));
   else
     _next_piece(THIS_FRAME.piece, swap);
