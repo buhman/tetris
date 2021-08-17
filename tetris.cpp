@@ -132,6 +132,7 @@ static void _next_piece(tetris::piece& p, tetris::tet t)
   p.tet = t;
   p.pos.u = 0;
   p.pos.v = 18;
+  p.facing = tetris::dir::up;
 }
 
 void tetris::swap()
