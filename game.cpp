@@ -1503,6 +1503,7 @@ void updateUniformBuffer(uint32_t currentImage) {
     for (int i = 0; i < 4; i++) {
       tetris::coord off = tetris::offsets[static_cast<int>(frame.piece.tet)][static_cast<int>(frame.piece.facing)][i];
       const int uboCellIndex = getCellIndex(frame.piece.pos.u + off.u, frame.piece.pos.v + off.v, frameIndex);
+      assert(uboCellIndex > 0);
       _ubo* _cell = (_ubo*)(((uint64_t)uboModels + (uboCellIndex * uniformDynamicAlignment)));
       _cell->color = cellColors[static_cast<int>(frame.piece.tet)];
     }
