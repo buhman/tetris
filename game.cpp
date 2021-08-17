@@ -107,7 +107,7 @@ constexpr int tetrisFrames = 2;
 constexpr int tetrisQueueSize = 5;
 constexpr int tetrisQueueInstances = tetrisQueueSize * 4 * tetrisFrames;
 constexpr int tetrisFieldInstances = tetris::rows * tetris::columns * tetrisFrames;
-constexpr int uniformModelInstances = tetrisFieldInstances + tetrisQueueInstances + 5 + 4;
+constexpr int uniformModelInstances = tetrisFieldInstances + tetrisQueueInstances + 4 + 5;
 static size_t uniformDynamicBufferSize;
 static size_t uboInstanceSize = (sizeof (_ubo));
 static void * uboModels;
@@ -1523,10 +1523,18 @@ void updateUniformBuffer(uint32_t currentImage) {
     }
 
     for (int i = 0; i < 4; i++) {
+      // piece
       tetris::coord off = tetris::offsets[(int)frame.piece.tet][(int)frame.piece.facing][i];
-      const int uboCellIndex = getCellIndex(frame.piece.pos.u + off.u, frame.piece.pos.v + off.v, frameIndex);
-      assert(uboCellIndex > 0);
-      _ubo* _cell = (_ubo*)(((uint64_t)uboModels + (uboCellIndex * uniformDynamicAlignment)));
+      _ubo* _cell;
+
+      const int ghostCellIndex = getCellIndex(frame.piece.pos.u + off.u, frame.piece.drop_row + off.v, frameIndex);
+      assert(ghostCellIndex > 0);
+      _cell = (_ubo*)(((uint64_t)uboModels + (ghostCellIndex * uniformDynamicAlignment)));
+      _cell->color = 0.1f * cellColors[(int)frame.piece.tet];
+
+      const int pieceCellIndex = getCellIndex(frame.piece.pos.u + off.u, frame.piece.pos.v + off.v, frameIndex);
+      assert(pieceCellIndex > 0);
+      _cell = (_ubo*)(((uint64_t)uboModels + (pieceCellIndex * uniformDynamicAlignment)));
       _cell->color = cellColors[(int)frame.piece.tet];
     }
 
