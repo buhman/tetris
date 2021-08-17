@@ -56,7 +56,6 @@ namespace tetris {
     tetris::tet tet;
     tetris::dir facing;
     tetris::coord pos;
-    bool swapped;
     int drop_row;
   };
 
@@ -74,6 +73,7 @@ namespace tetris {
     tetris::queue queue;
     tetris::piece piece;
     tetris::tet swap;
+    bool swapped;
   };
 
   constexpr int frame_count = 2;
@@ -83,6 +83,7 @@ namespace tetris {
 
   void event_reset_frame(tetris::side_t side);
 
+  void swap();
   void _place(tetris::field& field, tetris::piece& piece);
   void drop();
   void next_piece();

@@ -66,11 +66,7 @@ std::uniform_int_distribution<int> tet_distribution(0, (int)tetris::tet::empty -
 
 static void fill(tetris::cell& cell, int i, int j)
 {
-  if (i < 2 || i > 7) {
-    cell.color = static_cast<tetris::tet>(tet_distribution(generator));
-  } else {
-    cell.color = tetris::tet::empty;
-  }
+  cell.color = tetris::tet::empty;
 }
 
 static void reset_field(tetris::field& field)
@@ -141,12 +137,27 @@ static void _next_piece(tetris::piece& p, tetris::tet t)
     p.pos.v = 20;
 }
 
+void tetris::swap()
+{
+  assert(tetris::this_side != tetris::side_t::none);
+
+  THIS_FRAME.swapped = true;
+  tetris::tet swap = THIS_FRAME.swap;
+  THIS_FRAME.swap = THIS_FRAME.piece.tet;
+  if (THIS_FRAME.swap != tetris::tet::empty)
+    _next_piece(THIS_FRAME.piece, next_tet(THIS_FRAME));
+  else
+    _next_piece(THIS_FRAME.piece, swap);
+  update_drop_row(THIS_FRAME.piece);
+}
+
 void tetris::event_reset_frame(tetris::side_t side)
 {
   tetris::frame& frame = frames[(int)side];
   reset_field(frame.field);
   _next_piece(frame.piece, next_tet(frame));
   update_drop_row(frame.piece);
+  frame.swap = tetris::tet::empty;
   // bag
   // queue
   // swap
@@ -211,6 +222,7 @@ void tetris::drop()
 {
   assert(tetris::this_side != tetris::side_t::none);
 
+  THIS_FRAME.swapped = false;
   THIS_FRAME.piece.pos.v = THIS_FRAME.piece.drop_row;
   _place(THIS_FRAME.field, THIS_FRAME.piece);
 }

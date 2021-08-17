@@ -207,13 +207,25 @@ void client::input(tetris::event ev)
     tetris::next_piece();
     event_move(THIS_FRAME.piece, tetris::this_side);
     break;
-  case tetris::event::spin_cw:
+  case tetris::event::spin_ccw:
+    //case tetris::event::spin_cw:
     if (tetris::move({0, 0}, 1))
       event_move(THIS_FRAME.piece, tetris::this_side);
     break;
-  case tetris::event::spin_ccw:
+    //case tetris::event::spin_ccw:
+  case tetris::event::spin_cw:
     if (tetris::move({0, 0}, -1))
       event_move(THIS_FRAME.piece, tetris::this_side);
+    break;
+  case tetris::event::spin_180:
+    if (tetris::move({0, 0}, 2))
+      event_move(THIS_FRAME.piece, tetris::this_side);
+    break;
+  case tetris::event::swap:
+    if (!THIS_FRAME.swapped) {
+      tetris::swap();
+      event_move(THIS_FRAME.piece, tetris::this_side);
+    }
     break;
   default:
     std::cerr << "unhandled input ev " << static_cast<int>(ev) << '\n';
