@@ -84,6 +84,7 @@ namespace tetris {
     tetris::piece piece;
     tetris::tet swap;
     bool swapped;
+    int points;
     int level;
     time_point point;
   };
@@ -96,7 +97,7 @@ namespace tetris {
   void event_reset_frame(tetris::side_t side);
 
   void swap();
-  void _place(tetris::field& field, tetris::piece& piece);
+  void place(tetris::frame& frame);
   void drop();
   void next_piece();
   bool lock_delay(tetris::piece& piece);

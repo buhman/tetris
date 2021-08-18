@@ -172,7 +172,7 @@ static void loop()
       assert(header.side != tetris::this_side);
       assert(header.next_length == message::piece::size);
       message::piece::decode(buf_frame, tetris::frames[static_cast<int>(header.side)].piece);
-      tetris::_place(tetris::frames[(int)header.side].field, tetris::frames[(int)header.side].piece);
+      tetris::place(tetris::frames[(int)header.side]);
       break;
     default:
       std::cerr << "unhandled frame type " << header.type << '\n';

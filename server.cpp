@@ -238,7 +238,7 @@ static size_t handle_recv_frame(poll_action& action, uint8_t *bufi, size_t len)
   case message::type_t::_drop:
     assert(header.next_length == message::piece::size);
     message::piece::decode(bufi, tetris::frames[(int)header.side].piece);
-    tetris::_place(tetris::frames[(int)header.side].field, tetris::frames[(int)header.side].piece);
+    tetris::place(tetris::frames[(int)header.side]);
     broadcast::drop(header.side);
     break;
   default:

@@ -163,10 +163,11 @@ void tetris::event_reset_frame(tetris::side_t side)
 }
 
 
-static void clear_lines(tetris::field& field, tetris::piece& piece)
+static int clear_lines(tetris::field& field, tetris::piece& piece)
 {
   uint64_t seen = 0;
   uint64_t rows = 0;
+  int cleared = 0;
 
   for (int i = 0; i < 4; i++) {
     tetris::coord *offset = tetris::offsets[(int)piece.tet][(int)piece.facing];
@@ -181,6 +182,7 @@ static void clear_lines(tetris::field& field, tetris::piece& piece)
         goto next_line;
     }
 
+    cleared += 1;
     rows |= (1L << r);
 
   next_line:
@@ -201,9 +203,33 @@ static void clear_lines(tetris::field& field, tetris::piece& piece)
       }
     }
   }
+
+  return cleared;
 }
 
-void tetris::_place(tetris::field& field, tetris::piece& piece)
+namespace points {
+  static inline int next_level(int level)
+  {
+    constexpr int per_level = 10 >> 1;
+
+    return per_level * std::pow(level, 2) + per_level * level;
+  }
+
+  static inline int line_clear(int cleared)
+  {
+    switch (cleared) {
+    case 0: return 0;
+    case 1: return 1;
+    case 2: return 3;
+    case 3: return 5;
+    case 4: return 8;
+    default:
+      assert(false);
+    }
+  }
+}
+
+static int _place(tetris::field& field, tetris::piece& piece)
 {
   for (int i = 0; i < 4; i++) {
     tetris::coord *offset = tetris::offsets[(int)piece.tet][(int)piece.facing];
@@ -214,7 +240,18 @@ void tetris::_place(tetris::field& field, tetris::piece& piece)
     assert(cell.color == tetris::tet::empty);
     cell.color = piece.tet;
   }
-  clear_lines(field, piece);
+  int cleared = clear_lines(field, piece);
+  return cleared;
+}
+
+void tetris::place(tetris::frame& frame) {
+  int cleared = _place(frame.field, frame.piece);
+  int points = points::line_clear(cleared);
+  frame.points += points;
+  if (frame.points > points::next_level(frame.level)) {
+    frame.level++;
+    std::cerr << "level " << frame.level << '\n';
+  }
 }
 
 void tetris::drop()
@@ -223,7 +260,7 @@ void tetris::drop()
 
   THIS_FRAME.swapped = false;
   THIS_FRAME.piece.pos.v = THIS_FRAME.piece.drop_row;
-  _place(THIS_FRAME.field, THIS_FRAME.piece);
+  tetris::place(THIS_FRAME);
 }
 
 void tetris::next_piece()
