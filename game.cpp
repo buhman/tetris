@@ -110,7 +110,8 @@ constexpr int tetrisQueueInstances = tetrisQueueSize * 4 * tetrisFrames;
 constexpr int tetrisFieldInstances = tetris::rows * tetris::columns * tetrisFrames;
 constexpr int tetrisSwapInstances = 4 * tetrisFrames;
 constexpr int uniformSquareInstances = tetrisFieldInstances + tetrisQueueInstances + tetrisSwapInstances;
-constexpr int uniformModelInstances = uniformSquareInstances + 5;
+constexpr int uniformLineInstances = tetrisFrames;
+constexpr int uniformModelInstances = uniformSquareInstances + uniformLineInstances;
 static size_t uniformDynamicBufferSize;
 static size_t uboInstanceSize = (sizeof (_ubo));
 static void * uboModels;
@@ -210,7 +211,7 @@ void initWindow() {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-  window = glfwCreateWindow(1080, 1080, "tak tetris", nullptr, nullptr);
+  window = glfwCreateWindow(800, 800, "tak tetris", nullptr, nullptr);
 }
 
 bool assertValidationLayers() {
@@ -606,7 +607,7 @@ void createRenderPass() {
   subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
   subpass.colorAttachmentCount = 1;
   subpass.pColorAttachments = &colorAttachmentRef;
-  subpass.pDepthStencilAttachment = &depthAttachmentRef;
+  //subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
   VkSubpassDependency dependency{};
   dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -1168,9 +1169,8 @@ void createCommandBuffers() {
 
     //
 
-    /*
     vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline[1]);
-    for (uint32_t j = 0; j < 5; j++) {
+    for (uint32_t j = 0; j < uniformLineInstances; j++) {
       dynamicOffset = (j + uniformSquareInstances) * static_cast<uint32_t>(uniformDynamicAlignment);
       vkCmdBindDescriptorSets(commandBuffers[i],
                               VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1179,7 +1179,6 @@ void createCommandBuffers() {
 
       vkCmdDrawIndexed(commandBuffers[i], 5, 1, 0, 0, 0);
     }
-    */
 
     //
 
@@ -1604,38 +1603,13 @@ void updateUniformBuffer(uint32_t currentImage, float time) {
       swap->color = cellColors[(int)frame.swap];
     }
 
+    uboOffset = uniformSquareInstances + frameIndex;
+    _ubo* fieldBorder = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
+    fieldBorder->model = glm::scale(glm::mat4(1.0f), glm::vec3(10.0f, 20.0f, 0.0f));
+    fieldBorder->view = _ndc * _frame[frameIndex] * _field;
+    fieldBorder->color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
     frameIndex++;
-  }
-
-  uboOffset = tetrisFieldInstances + tetrisQueueInstances + tetrisSwapInstances;
-  _ubo* red = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
-  red->model = glm::scale(glm::mat4(1.0f), glm::vec3(40.0f, 40.0f, 0.0f));
-  red->view = _ndc;
-  //red->color = glm::vec4(1.0f, 0.0f, 0.0f);
-  red->color = glm::vec4(0.1f, 0.1f, 0.1f, 0.0f);
-
-
-  for (int i = 0; i < 2; i++) {
-    int off = i * 2 + 1;
-    //int off = i * 3 + 1;
-
-    _ubo* green = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
-    green->model = glm::scale(glm::mat4(1.0f), glm::vec3(20.0f, 20.0f, 0.0f));
-    green->view = _ndc * _frame[i];
-    //green->color = glm::vec4(0.0f, 1.0f, 0.0f);
-    green->color = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f);
-
-    _ubo* cyan = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
-    cyan->model = glm::scale(glm::mat4(1.0f), glm::vec3(10.0f, 20.0f, 0.0f));
-    cyan->view = _ndc * _frame[i] * _field;
-    cyan->color = glm::vec4(0.0f, 1.0f, 1.0f, 1.0f);
-
-    /*
-    _ubo* magenta = (_ubo*)(((uint64_t)uboModels + ((2 + off) * uniformDynamicAlignment)));
-    magenta->model = glm::mat4(1.0f);
-    magenta->view = _ndc * _frame[i] * _play;
-    magenta->color = glm::vec4(1.0f, 0.0f, 1.0f);
-    */
   }
 
   /*
@@ -1649,16 +1623,14 @@ void updateUniformBuffer(uint32_t currentImage, float time) {
 
   //
 
-  glm::mat4 view = glm::ortho( -1.f, 1.f, -1.f, 1.f, -2.f, 2.f );
+  glm::mat4 view = glm::mat4(1.0f);
+  //glm::mat4 view = glm::ortho( -1.f, 1.f, -1.f, 1.f, -2.f, 2.f );
   float ratio = ((float)swapChainExtent.height / (float)swapChainExtent.width);
   if (ratio < 0.5) {
     view[0][0] = (ratio * 2);
     view[1][1] = 1.0f / 0.5f;
   } else
     view[1][1] = 1.0f / ratio;
-
-  view = glm::rotate(view, glm::radians((std::sin(time * 0.1f) + 1.0f) * 45.0f), glm::vec3(1.0f, 1.0f, 1.0f));
-
 
   vkMapMemory(logicalDevice, uniformBuffersMemory[currentImage], 0, uniformBufferSize, 0, &data);
   memcpy(data, &view, uniformBufferSize);

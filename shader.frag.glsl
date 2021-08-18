@@ -43,18 +43,16 @@ vec3 srgb_to_rgb(vec3 srgb) {
 const vec3 lightDir = vec3(0.5, 0.6, -0.9);
 
 void main() {
-  vec3 dX = dFdx(fragPos.xyz);
-  vec3 dY = dFdy(fragPos.xyz);
-  vec3 normal = normalize(cross(dX, dY));
-  float light = max(0.0, dot(lightDir, normal));
+  //vec3 dX = dFdx(fragPos.xyz);
+  //vec3 dY = dFdy(fragPos.xyz);
+  //vec3 normal = normalize(cross(dX, dY));
+  //float light = max(0.0, dot(lightDir, normal));
 
   if (fragVertColor.x < 1.0f)
     outColor = vec4(0.0f);
   else {
     vec3 _color = vec3(srgb_to_rgb(fragColor.xyz) * fragVertColor);
-    //outColor = vec4(_color, fragColor.w);
-    outColor = vec4(pow(light * _color, vec3(1.5)), fragColor.w);
+    outColor = vec4(_color, fragColor.w);
+    //outColor = vec4(pow(light * _color, vec3(1.5)), fragColor.w);
   }
-  //
-  /*outColor = texture(texSampler, vec2(-0.5, -0.5) + (fragTexCoord * 0.5));*/
 }
