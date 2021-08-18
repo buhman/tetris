@@ -231,18 +231,22 @@ void client::input(tetris::event ev)
   }
 }
 
+
 void client::tick()
 {
   if (tetris::this_side == tetris::side_t::none)
     return;
 
   if (tetris::move({0, -1}, 0)) {
+    THIS_FRAME.piece.lock_delay.locking = false;
     event_move(THIS_FRAME.piece, tetris::this_side);
   } else {
-    tetris::drop();
-    event_drop(THIS_FRAME.piece, tetris::this_side);
-    tetris::next_piece();
-    event_move(THIS_FRAME.piece, tetris::this_side);
+    if (!tetris::lock_delay(THIS_FRAME.piece)) {
+      tetris::drop();
+      event_drop(THIS_FRAME.piece, tetris::this_side);
+      tetris::next_piece();
+      event_move(THIS_FRAME.piece, tetris::this_side);
+    }
   }
 }
 

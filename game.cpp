@@ -1580,6 +1580,8 @@ void updateUniformBuffer(uint32_t currentImage, float time) {
       assert(pieceCellIndex >= 0);
       _cell = (_ubo*)(((uint64_t)uboModels + (pieceCellIndex * uniformDynamicAlignment)));
       _cell->color = cellColors[(int)frame.piece.tet];
+      if (frame.piece.lock_delay.locking)
+        _cell->color = glm::vec4(_cell->color.xyz() * 1.5f, _cell->color.w);
     }
 
     uboOffset = tetrisFieldInstances + (frameIndex * tetrisQueueSize * 4) + (frameIndex * 4);

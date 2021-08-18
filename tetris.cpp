@@ -133,6 +133,8 @@ static void _next_piece(tetris::piece& p, tetris::tet t)
   p.pos.u = 0;
   p.pos.v = 18;
   p.facing = tetris::dir::up;
+  p.lock_delay.moves = 0;
+  p.lock_delay.locking = false;
 }
 
 void tetris::swap()
@@ -233,6 +235,29 @@ void tetris::next_piece()
   update_drop_row(THIS_FRAME.piece);
 }
 
+bool tetris::lock_delay(tetris::piece& piece)
+{
+  int& moves = piece.lock_delay.moves;
+  auto& point = piece.lock_delay.point;
+  auto now = tetris::clock::now();
+
+  if (!piece.lock_delay.locking) {
+    piece.lock_delay.locking = true;
+    point = tetris::clock::now();
+    piece.lock_delay.moves = 0;
+  }
+
+  float duration = tetris::duration(now - point).count();
+
+  if (moves < 15 && duration < 500.0f) {
+    moves++;
+    return true;
+  } else {
+    moves = 0;
+    return false;
+  }
+}
+
 bool tetris::move(tetris::coord offset, int rotation)
 {
   assert(tetris::this_side != tetris::side_t::none);
@@ -250,6 +275,12 @@ bool tetris::move(tetris::coord offset, int rotation)
     piece.facing = p.facing;
     if (offset.u || rotation)
       update_drop_row(piece);
+
+    if (piece.lock_delay.locking) {
+      piece.lock_delay.moves += 1;
+      piece.lock_delay.point = tetris::clock::now();
+    }
+
     return true;
   }
 }

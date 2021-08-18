@@ -3,6 +3,7 @@
 #include <vector>
 #include <array>
 #include <unordered_set>
+#include <chrono>
 
 namespace tetris {
   enum class tet {
@@ -52,11 +53,20 @@ namespace tetris {
     int v;
   };
 
+  using clock = std::chrono::high_resolution_clock;
+  using time_point = std::chrono::time_point<std::chrono::high_resolution_clock>;
+  using duration = std::chrono::duration<float, std::chrono::milliseconds::period>;
+
   struct piece {
     tetris::tet tet;
     tetris::dir facing;
     tetris::coord pos;
     int drop_row;
+    struct {
+      int moves;
+      time_point point;
+      bool locking;
+    } lock_delay;
   };
 
   extern coord offsets[static_cast<int>(tetris::tet::last)][4][4];
@@ -87,6 +97,7 @@ namespace tetris {
   void _place(tetris::field& field, tetris::piece& piece);
   void drop();
   void next_piece();
+  bool lock_delay(tetris::piece& piece);
   bool move(tetris::coord offset, int rotation);
   void init();
 }
