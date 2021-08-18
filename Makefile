@@ -17,7 +17,7 @@ SERVER_SRC = server.cpp bswap.cpp message.cpp tetris.cpp
 SERVER_OBJ = $(SERVER_SRC:.cpp=.o)
 SERVER_DEP = $(SERVER_OBJ:%.o=%.d)
 
-CXXFLAGS = -g -Og -std=c++20
+CXXFLAGS = -Wall -g -Og -std=c++20
 CXX = g++
 
 %.d: %.cpp

@@ -283,8 +283,6 @@ void createInstance() {
     createInfo.ppEnabledLayerNames = validationLayers.data();
   }
 
-  VkResult result = vkCreateInstance(&createInfo, nullptr, &instance);
-
   if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
     throw std::runtime_error("failed to create instance");
   }
@@ -599,9 +597,9 @@ void createRenderPass() {
   depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-  VkAttachmentReference depthAttachmentRef{};
-  depthAttachmentRef.attachment = 1;
-  depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+  //VkAttachmentReference depthAttachmentRef{};
+  //depthAttachmentRef.attachment = 1;
+  //depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
   VkSubpassDescription subpass{};
   subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -1338,7 +1336,7 @@ void createDepth() {
 }
 
 void createTextureImage() {
-  int width, height, channels;
+  int width, height; //, channels;
   /*
   stbi_uc* pixels = stbi_load("texture.jpg", &width, &height, &channels, STBI_rgb_alpha);
   if (!pixels)
@@ -1474,6 +1472,7 @@ void initVulkan() {
 }
 
 int getCellIndex(int u, int v, int frameIndex) {
+  assert(u >= 0 && v >= 0 && v < tetris::rows && u < tetris::columns);
   return (v * tetris::columns + u) + (frameIndex * tetris::rows * tetris::columns);
 }
 
@@ -1551,7 +1550,6 @@ void updateUniformBuffer(uint32_t currentImage) {
   */
 
   int uboOffset = 0;
-  int asdf = 0;
 
   int frameIndex = 0;
   for (auto& frame : tetris::frames) {
@@ -1572,12 +1570,12 @@ void updateUniformBuffer(uint32_t currentImage) {
       _ubo* _cell;
 
       const int ghostCellIndex = getCellIndex(frame.piece.pos.u + off.u, frame.piece.drop_row + off.v, frameIndex);
-      assert(ghostCellIndex >= 0);
+      assert(ghostCellIndex >= 0 && ghostCellIndex < tetrisFieldInstances);
       _cell = (_ubo*)(((uint64_t)uboModels + (ghostCellIndex * uniformDynamicAlignment)));
       _cell->color = glm::vec4(cellColors[(int)frame.piece.tet].xyz(), 0.1f);
 
       const int pieceCellIndex = getCellIndex(frame.piece.pos.u + off.u, frame.piece.pos.v + off.v, frameIndex);
-      assert(pieceCellIndex >= 0);
+      assert(pieceCellIndex >= 0 && pieceCellIndex < tetrisFieldInstances);
       _cell = (_ubo*)(((uint64_t)uboModels + (pieceCellIndex * uniformDynamicAlignment)));
       _cell->color = cellColors[(int)frame.piece.tet];
       if (frame.piece.lock_delay.locking)
@@ -1586,7 +1584,7 @@ void updateUniformBuffer(uint32_t currentImage) {
 
     uboOffset = tetrisFieldInstances + (frameIndex * tetrisQueueSize * 4) + (frameIndex * 4);
     for (int qi = 0; qi < tetrisQueueSize; qi++) {
-      tetris::tet qtet = qi >= frame.queue.size() ? tetris::tet::empty : frame.queue[(tetrisQueueSize - 1) - qi];
+      tetris::tet qtet = qi >= (int)frame.queue.size() ? tetris::tet::empty : frame.queue[(tetrisQueueSize - 1) - qi];
 
       for (int ti = 0; ti < 4; ti++) {
         tetris::coord off = tetris::offsets[(int)qtet][(int)tetris::dir::up][ti];

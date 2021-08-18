@@ -11,5 +11,5 @@ glm::vec4 cellColors[static_cast<int>(tetris::tet::last_color)] = {
   [static_cast<int>(tetris::tet::j)] = glm::vec4(0.353f, 0.396f, 0.678f, 1.0f),
   [static_cast<int>(tetris::tet::t)] = glm::vec4(0.678f, 0.302f, 0.612f, 1.0f),
   [static_cast<int>(tetris::tet::empty)] = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f),
-  [static_cast<int>(tetris::tet::last)] = glm::vec4(0.9f, 0.3f, 0.3f, 1.0f),
+  [static_cast<int>(tetris::tet::last)] = glm::vec4(0.3f, 0.3f, 0.3f, 1.0f),
 };

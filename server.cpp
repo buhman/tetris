@@ -147,6 +147,18 @@ namespace queue_send {
     _epoll_mod(action.fd, EPOLLOUT);
   }
 
+  static void next_piece(poll_action& action, tetris::side_t piece_side, tetris::piece& piece)
+  {
+    std::cerr << "_next_piece\n";
+    message::frame_header_t header;
+    header.type = message::type_t::_next_piece;
+    header.side = piece_side;
+    header.next_length = message::piece::size;
+
+    action.queue.push(std::pair{header, message::next_t{piece}});
+    _epoll_mod(action.fd, EPOLLOUT);
+  }
+
   static void drop(poll_action& action, tetris::side_t piece_side, tetris::piece& piece)
   {
     message::frame_header_t header;
@@ -157,6 +169,17 @@ namespace queue_send {
     action.queue.push(std::pair{header, message::next_t{piece}});
     _epoll_mod(action.fd, EPOLLOUT);
   }
+
+  static void garbage(poll_action& action, tetris::side_t piece_side, uint8_t lines)
+  {
+    message::frame_header_t header;
+    header.type = message::type_t::_garbage;
+    header.side = piece_side;
+    header.next_length = message::garbage::size;
+
+    action.queue.push(std::pair{header, message::next_t{lines}});
+    _epoll_mod(action.fd, EPOLLOUT);
+  }
 }
 
 namespace broadcast {
@@ -165,8 +188,8 @@ namespace broadcast {
     for (auto& client : clients) {
       if (client.second.side == origin || client.second.type == poll_action::accept)
         continue;
-      std::cerr << "broadcast field " << static_cast<int>(origin) << " to fd " << client.second.fd << '\n';
-      queue_send::field(client.second, origin, tetris::frames[static_cast<int>(origin)].field);
+      std::cerr << "broadcast field " << (int)origin << " to fd " << client.second.fd << '\n';
+      queue_send::field(client.second, origin, tetris::frames[(int)origin].field);
     }
   }
 
@@ -175,8 +198,18 @@ namespace broadcast {
     for (auto& client : clients) {
       if (client.second.side == origin || client.second.type == poll_action::accept)
         continue;
-      std::cerr << "broadcast move " << static_cast<int>(origin) << " to fd " << client.second.fd << '\n';
-      queue_send::move(client.second, origin, tetris::frames[static_cast<int>(origin)].piece);
+      std::cerr << "broadcast move " << (int)origin << " to fd " << client.second.fd << '\n';
+      queue_send::move(client.second, origin, tetris::frames[(int)origin].piece);
+    }
+  }
+
+  static void next_piece(tetris::side_t origin)
+  {
+    for (auto& client : clients) {
+      if (client.second.side == origin || client.second.type == poll_action::accept)
+        continue;
+      std::cerr << "broadcast next_piece " << (int)origin << " to fd " << client.second.fd << '\n';
+      queue_send::next_piece(client.second, origin, tetris::frames[(int)origin].piece);
     }
   }
 
@@ -185,8 +218,19 @@ namespace broadcast {
     for (auto& client : clients) {
       if (client.second.side == origin || client.second.type == poll_action::accept)
         continue;
-      std::cerr << "broadcast drop " << static_cast<int>(origin) << " to fd " << client.second.fd << '\n';
-      queue_send::drop(client.second, origin, tetris::frames[static_cast<int>(origin)].piece);
+      std::cerr << "broadcast drop " << (int)origin << " to fd " << client.second.fd << '\n';
+      queue_send::drop(client.second, origin, tetris::frames[(int)origin].piece);
+    }
+  }
+
+  static void garbage(tetris::side_t dest, uint8_t lines)
+  {
+    for (auto& client : clients) {
+      // there is no origin; garbage is server-initiated
+      if (client.second.type == poll_action::accept)
+        continue;
+      std::cerr << "broadcast garbage " << (int)dest << " to fd " << client.second.fd << '\n';
+      queue_send::garbage(client.second, dest, lines);
     }
   }
 }
@@ -235,12 +279,28 @@ static size_t handle_recv_frame(poll_action& action, uint8_t *bufi, size_t len)
     message::piece::decode(bufi, tetris::frames[(int)header.side].piece);
     broadcast::move(header.side);
     break;
+  case message::type_t::_next_piece:
+    message::piece::decode(bufi, tetris::frames[(int)header.side].piece);
+    broadcast::next_piece(header.side);
+    tetris::_garbage(tetris::frames[(int)header.side]);
+    break;
   case message::type_t::_drop:
+  {
     assert(header.next_length == message::piece::size);
     message::piece::decode(bufi, tetris::frames[(int)header.side].piece);
-    tetris::place(tetris::frames[(int)header.side]);
+    int cleared = tetris::place(tetris::frames[(int)header.side]);
     broadcast::drop(header.side);
+    if (cleared > 0) {
+      std::cerr << "garbage created by " << (int)header.side << '\n';
+      tetris::side_t next_side = (tetris::side_t)(((int)header.side + 1) % (tetris::frame_count - sides.size()));
+      if (next_side != header.side) {
+        tetris::garbage(tetris::frames[(int)next_side], cleared);
+        broadcast::garbage(next_side, cleared);
+      } else
+        std::cerr << "garbage not sent\n";
+    }
     break;
+  }
   default:
     std::cerr << "unhandled frame type " << header.type << '\n';
     break;
@@ -371,6 +431,7 @@ int main()
 {
   sides.insert(tetris::side_t::zero);
   sides.insert(tetris::side_t::one);
+  assert(sides.size() == tetris::frame_count);
   tetris::init();
 
   try {

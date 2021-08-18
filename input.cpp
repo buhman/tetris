@@ -85,7 +85,6 @@ void handle_button(int button) {
 }
 
 void input::poll_gamepads() {
-  int ret;
   std::set<int>::iterator it;
   int jid;
   GLFWgamepadstate gamepad;

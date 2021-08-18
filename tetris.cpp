@@ -115,7 +115,7 @@ static bool collision(tetris::piece& p)
     int r = p.pos.v + offset[i].v;
 
     tetris::cell cell = THIS_FRAME.field[q][r];
-    if (cell.color != tetris::tet::empty || q == -1 || q == 10 || r == -1 || r == 40)
+    if (cell.color != tetris::tet::empty || q == -1 || q == tetris::columns || r == -1 || r == tetris::rows)
       return true;
   }
   return false;
@@ -123,6 +123,7 @@ static bool collision(tetris::piece& p)
 
 static void update_drop_row(tetris::piece& piece) {
   tetris::piece p = piece;
+  assert(!collision(piece));
   while (!collision(p))
     p.pos.v -= 1;
   piece.drop_row = p.pos.v + 1;
@@ -177,7 +178,7 @@ static int clear_lines(tetris::field& field, tetris::piece& piece)
 
     seen |= (1L << r);
 
-    for (int x = 0; x < 10; x++) {
+    for (int x = 0; x < tetris::columns; x++) {
       if (field[x][r].color == tetris::tet::empty)
         goto next_line;
     }
@@ -190,13 +191,13 @@ static int clear_lines(tetris::field& field, tetris::piece& piece)
   }
 
   int off = 0;
-  for (int row = 0; row < 40; row++) {
+  for (int row = 0; row < tetris::rows; row++) {
     while (rows & (1L << (row + off))) {
       off++;
     }
 
-    for (int col = 0; col < 10; col++) {
-      if ((row + off) >= 40 && off > 0)
+    for (int col = 0; col < tetris::columns; col++) {
+      if ((row + off) >= tetris::rows && off > 0)
         fill(field[col][row], col, row);
       else {
         field[col][row].color = field[col][row + off].color;
@@ -244,7 +245,7 @@ static int _place(tetris::field& field, tetris::piece& piece)
   return cleared;
 }
 
-void tetris::place(tetris::frame& frame) {
+int tetris::place(tetris::frame& frame) {
   int cleared = _place(frame.field, frame.piece);
   int points = points::line_clear(cleared);
   frame.points += points;
@@ -252,6 +253,7 @@ void tetris::place(tetris::frame& frame) {
     frame.level++;
     std::cerr << "level " << frame.level << '\n';
   }
+  return cleared;
 }
 
 void tetris::drop()
@@ -268,6 +270,8 @@ void tetris::next_piece()
   assert(tetris::this_side != tetris::side_t::none);
 
   _next_piece(THIS_FRAME.piece, next_tet(THIS_FRAME));
+  std::cerr << (int)tetris::this_side << ' ' << THIS_FRAME.garbage << '\n';
+  _garbage(THIS_FRAME);
   update_drop_row(THIS_FRAME.piece);
 }
 
@@ -341,12 +345,47 @@ bool tetris::gravity(tetris::frame& frame)
   }
 }
 
+void tetris::_garbage(tetris::frame& frame)
+{
+  tetris::field& field = frame.field;
+  int lines = frame.garbage;
+  assert(lines >= 0);
+  if (lines == 0)
+    return;
+
+  std::cerr << "_garbage processing\n";
+
+  for (int row = tetris::rows - 1; row >= 0; row--) {
+    for (int col = 0; col < tetris::columns; col++) {
+      if (row >= tetris::rows - lines) {
+        //assert(field[col][row].color == tetris::tet::empty);
+      } else if (lines > row) {
+        field[col][row].color = tetris::tet::last;
+      } else {
+        std::cerr << row << '\n';
+        assert(row - lines >= 0);
+        field[col][row].color = field[col][row - lines].color;
+      }
+    }
+  }
+  frame.garbage = 0;
+}
+
+void tetris::garbage(tetris::frame& frame, int lines)
+{
+  std::cerr << "received garbage " << (void*)&frame << ' ' << lines << '\n';
+  frame.garbage += lines;
+  if (frame.garbage > 20)
+    frame.garbage = 20;
+}
+
 void tetris::init()
 {
   for (int i = 0; i < tetris::frame_count; i++) {
     tetris::frames[i].queue.clear();
     tetris::frames[i].bag.clear();
     tetris::frames[i].piece.tet = tetris::tet::empty;
+    std::cerr << "dr" << tetris::frames[i].piece.drop_row << '\n';
     tetris::frames[i].swap = tetris::tet::empty;
     tetris::frames[i].point = tetris::clock::now();
   }

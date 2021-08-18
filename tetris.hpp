@@ -87,6 +87,7 @@ namespace tetris {
     int points;
     int level;
     time_point point;
+    int garbage;
   };
 
   constexpr int frame_count = 2;
@@ -97,11 +98,13 @@ namespace tetris {
   void event_reset_frame(tetris::side_t side);
 
   void swap();
-  void place(tetris::frame& frame);
+  int place(tetris::frame& frame);
   void drop();
   void next_piece();
   bool lock_delay(tetris::piece& piece);
   bool move(tetris::coord offset, int rotation);
   bool gravity(tetris::frame& frame);
+  void _garbage(tetris::frame& frame);
+  void garbage(tetris::frame& frame, int lines);
   void init();
 }

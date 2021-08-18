@@ -62,7 +62,7 @@ namespace piece {
     piece.facing = static_cast<tetris::dir>(buf[1]);
     piece.pos.u = ((std::int8_t*)buf)[2];
     piece.pos.v = ((std::int8_t*)buf)[3];
-    piece.drop_row = buf[4];
+    piece.drop_row = ((std::int8_t*)buf)[4];
   }
 
   void encode(const tetris::piece& piece, std::uint8_t * buf)
@@ -71,7 +71,19 @@ namespace piece {
     buf[1] = static_cast<uint8_t>(piece.facing);
     ((std::int8_t*)buf)[2] = piece.pos.u;
     ((std::int8_t*)buf)[3] = piece.pos.v;
-    buf[4] = piece.drop_row;
+    ((std::int8_t*)buf)[4] = piece.drop_row;
+  }
+}
+
+namespace garbage {
+  void decode(const std::uint8_t * buf, std::uint8_t& lines)
+  {
+    lines = buf[0];
+  }
+
+  void encode(const std::uint8_t lines, std::uint8_t * buf)
+  {
+    buf[0] = lines;
   }
 }
 
@@ -87,11 +99,16 @@ size_t encode(const frame_header_t& header, const next_t& next, std::uint8_t * b
   case message::type_t::_side:
     assert(header.next_length == 0);
     return message::frame_header::size;
+  case message::type_t::_next_piece:
   case message::type_t::_move:
   case message::type_t::_drop:
     assert(header.next_length == message::piece::size);
     message::piece::encode(std::get<tetris::piece>(next), buf);
     return message::frame_header::size + message::piece::size;
+  case message::type_t::_garbage:
+    assert(header.next_length == message::garbage::size);
+    message::garbage::encode(std::get<uint8_t>(next), buf);
+    return message::frame_header::size + message::garbage::size;
   default:
     std::cerr << header.type << '\n';
     assert(false);
