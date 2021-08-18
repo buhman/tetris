@@ -107,7 +107,9 @@ constexpr int tetrisFrames = 2;
 constexpr int tetrisQueueSize = 5;
 constexpr int tetrisQueueInstances = tetrisQueueSize * 4 * tetrisFrames;
 constexpr int tetrisFieldInstances = tetris::rows * tetris::columns * tetrisFrames;
-constexpr int uniformModelInstances = tetrisFieldInstances + tetrisQueueInstances + 4 + 5;
+constexpr int tetrisSwapInstances = 4 * tetrisFrames;
+constexpr int uniformSquareInstances = tetrisFieldInstances + tetrisQueueInstances + tetrisSwapInstances;
+constexpr int uniformModelInstances = uniformSquareInstances + 5;
 static size_t uniformDynamicBufferSize;
 static size_t uboInstanceSize = (sizeof (_ubo));
 static void * uboModels;
@@ -1139,7 +1141,7 @@ void createCommandBuffers() {
     uint32_t dynamicOffset;
 
     vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline[0]);
-    for (uint32_t j = 0; j < (tetrisFieldInstances + tetrisQueueInstances + 4); j++) {
+    for (uint32_t j = 0; j < uniformSquareInstances; j++) {
       dynamicOffset = j * static_cast<uint32_t>(uniformDynamicAlignment);
       vkCmdBindDescriptorSets(commandBuffers[i],
                               VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1153,7 +1155,7 @@ void createCommandBuffers() {
 
     vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline[1]);
     for (uint32_t j = 0; j < 5; j++) {
-      dynamicOffset = (j + tetrisFieldInstances + tetrisQueueInstances + 4) * static_cast<uint32_t>(uniformDynamicAlignment);
+      dynamicOffset = (j + uniformSquareInstances) * static_cast<uint32_t>(uniformDynamicAlignment);
       vkCmdBindDescriptorSets(commandBuffers[i],
                               VK_PIPELINE_BIND_POINT_GRAPHICS,
                               pipelineLayout, 0, 1,
@@ -1519,13 +1521,13 @@ void updateUniformBuffer(uint32_t currentImage) {
   glm::mat4 _field; // frame-relative
   _field = glm::translate(glm::mat4(1.0f), glm::vec3(5.0f, 0.0f, 0.0f));
 
-  glm::mat4 _swap;  // frame-relative
-  _swap = glm::translate(glm::mat4(1.0f), glm::vec3(16.0f, 19.0f, 0.0f));
-  _swap = glm::scale(_swap, glm::vec3(0.75f, 0.75f, 0.0f));
-
   glm::mat4 _queue;  // frame-relative
-  _queue = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 19.0f, 0.0f));
+  _queue = glm::translate(glm::mat4(1.0f), glm::vec3(16.0f, 19.0f, 0.0f));
   _queue = glm::scale(_queue, glm::vec3(0.75f, 0.75f, 0.0f));
+
+  glm::mat4 _swap;  // frame-relative
+  _swap = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 19.0f, 0.0f));
+  _swap = glm::scale(_swap, glm::vec3(0.75f, 0.75f, 0.0f));
 
 
   /*
@@ -1533,6 +1535,7 @@ void updateUniformBuffer(uint32_t currentImage) {
   */
 
   int uboOffset = 0;
+  int asdf = 0;
 
   int frameIndex = 0;
   for (auto& frame : tetris::frames) {
@@ -1553,26 +1556,26 @@ void updateUniformBuffer(uint32_t currentImage) {
       _ubo* _cell;
 
       const int ghostCellIndex = getCellIndex(frame.piece.pos.u + off.u, frame.piece.drop_row + off.v, frameIndex);
-      assert(ghostCellIndex > 0);
+      assert(ghostCellIndex >= 0);
       _cell = (_ubo*)(((uint64_t)uboModels + (ghostCellIndex * uniformDynamicAlignment)));
       _cell->color = 0.1f * cellColors[(int)frame.piece.tet];
 
       const int pieceCellIndex = getCellIndex(frame.piece.pos.u + off.u, frame.piece.pos.v + off.v, frameIndex);
-      assert(pieceCellIndex > 0);
+      assert(pieceCellIndex >= 0);
       _cell = (_ubo*)(((uint64_t)uboModels + (pieceCellIndex * uniformDynamicAlignment)));
       _cell->color = cellColors[(int)frame.piece.tet];
     }
 
-    uboOffset = tetrisFieldInstances;
-    for (int qi = 0; qi < 5; qi++) {
-      tetris::tet qtet = qi >= frame.queue.size() ? tetris::tet::empty : frame.queue[4 - qi];
+    uboOffset = tetrisFieldInstances + (frameIndex * tetrisQueueSize * 4) + (frameIndex * 4);
+    for (int qi = 0; qi < tetrisQueueSize; qi++) {
+      tetris::tet qtet = qi >= frame.queue.size() ? tetris::tet::empty : frame.queue[(tetrisQueueSize - 1) - qi];
 
       for (int ti = 0; ti < 4; ti++) {
         tetris::coord off = tetris::offsets[(int)qtet][(int)tetris::dir::up][ti];
-        _ubo* swap = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
-        swap->model = glm::translate(glm::mat4(1.0f), glm::vec3(off.u - 3.0f, ((float)qi + 1) * -3.0f + off.v, 0.0f));
-        swap->view = _ndc * _frame[frameIndex] * _swap;
-        swap->color = cellColors[(int)qtet];
+        _ubo* queue = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
+        queue->model = glm::translate(glm::mat4(1.0f), glm::vec3(off.u - 3.0f, ((float)qi + 1) * -3.0f + off.v, 0.0f));
+        queue->view = _ndc * _frame[frameIndex] * _queue;
+        queue->color = cellColors[(int)qtet];
       }
     }
 
@@ -1580,14 +1583,14 @@ void updateUniformBuffer(uint32_t currentImage) {
       tetris::coord off = tetris::offsets[(int)frame.swap][(int)tetris::dir::up][ti];
       _ubo* swap = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
       swap->model = glm::translate(glm::mat4(1.0f), glm::vec3(off.u - 3.0f, -3.0f + off.v, 0.0f));
-      swap->view = _ndc * _frame[frameIndex] * _queue;
+      swap->view = _ndc * _frame[frameIndex] * _swap;
       swap->color = cellColors[(int)frame.swap];
     }
 
     frameIndex++;
   }
 
-  uboOffset = tetrisFieldInstances + tetrisQueueInstances + 4;
+  uboOffset = tetrisFieldInstances + tetrisQueueInstances + tetrisSwapInstances;
   _ubo* red = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
   red->model = glm::scale(glm::mat4(1.0f), glm::vec3(40.0f, 40.0f, 0.0f));
   red->view = _ndc;
