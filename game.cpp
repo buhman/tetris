@@ -114,17 +114,42 @@ static void * uboModels;
 
 // clockwise
 const std::vector<vertex> vertices = {
-  {{ 0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 0.0f}, {-1.0f, -1.0f}}, // yellow
-  {{ 0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 1.0f}, { 1.0f, -1.0f}}, // cyan
-  {{ 1.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 1.0f}, { 1.0f,  1.0f}}, // magenta
-  {{ 1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {-1.0f,  1.0f}}, // red
+  {{ 0.0f, 0.0f, 0.7f}, {0.5f, 0.5f, 0.5f}, {-1.0f, -1.0f}},
+  {{ 0.0f, 1.0f, 0.7f}, {0.5f, 0.5f, 0.5f}, { 1.0f, -1.0f}},
+  {{ 1.0f, 1.0f, 0.7f}, {0.5f, 0.5f, 0.5f}, { 1.0f,  1.0f}},
+  {{ 1.0f, 0.0f, 0.7f}, {0.5f, 0.5f, 0.5f}, {-1.0f,  1.0f}},
+
+  {{ 0.3f, 0.3f, 0.4f}, {1.0f, 1.0f, 1.0f}, {-1.0f, -1.0f}},
+  {{ 0.3f, 0.7f, 0.4f}, {1.0f, 1.0f, 1.0f}, { 1.0f, -1.0f}},
+  {{ 0.7f, 0.7f, 0.4f}, {1.0f, 1.0f, 1.0f}, { 1.0f,  1.0f}},
+  {{ 0.7f, 0.3f, 0.4f}, {1.0f, 1.0f, 1.0f}, {-1.0f,  1.0f}},
 };
+
+/*
+   0      1
+     4  5
+     7  6
+   3      2
+ */
+
 
 const std::vector<uint16_t> indices = {
   0, 1, 2, 3, 0,
 
-  0, 1, 2,
-  2, 3, 0,
+  4, 5, 6,
+  6, 7, 4,
+
+  0, 1, 4,
+  4, 1, 5,
+
+  1, 2, 6,
+  6, 5, 1,
+
+  2, 3, 6,
+  6, 3, 7,
+
+  3, 0, 7,
+  7, 0, 4,
 };
 
 struct mvp_t {
@@ -1121,7 +1146,7 @@ void createCommandBuffers() {
                               pipelineLayout, 0, 1,
                               &descriptorSets[i], 1, &dynamicOffset);
 
-      vkCmdDrawIndexed(commandBuffers[i], 6, 1, 5, 0, 0);
+      vkCmdDrawIndexed(commandBuffers[i], 30, 1, 5, 0, 0);
     }
 
     //
