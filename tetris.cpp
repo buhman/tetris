@@ -257,5 +257,9 @@ bool tetris::move(tetris::coord offset, int rotation)
 void tetris::init()
 {
   for (int i = 0; i < tetris::frame_count; i++) {
+    tetris::frames[i].queue.clear();
+    tetris::frames[i].bag.clear();
+    tetris::frames[i].piece.tet = tetris::tet::empty;
+    tetris::frames[i].swap = tetris::tet::empty;
   }
 }

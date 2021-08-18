@@ -2,9 +2,9 @@
 
 layout(binding = 1) uniform sampler2D texSampler;
 
-layout(location = 0) in vec3 fragColor;
+layout(location = 0) in vec4 fragColor;
 layout(location = 1) in vec3 fragVertColor;
-layout(location = 2) in vec3 fragPos;
+layout(location = 2) in vec4 fragPos;
 
 layout(location = 0) out vec4 outColor;
 
@@ -40,15 +40,21 @@ vec3 srgb_to_rgb(vec3 srgb) {
     );
 }
 
-const vec3 lightDir = vec3(0.76, 0.8, -0.5);
+const vec3 lightDir = vec3(0.5, 0.6, -0.9);
 
 void main() {
-  vec3 dX = dFdx((2 * fragPos) - 1);
-  vec3 dY = dFdy((2 * fragPos) - 1);
+  vec3 dX = dFdx(fragPos.xyz);
+  vec3 dY = dFdy(fragPos.xyz);
   vec3 normal = normalize(cross(dX, dY));
   float light = max(0.0, dot(lightDir, normal));
 
-  //outColor = vec4(srgb_to_rgb(fragColor), 1.0);
-  outColor = vec4(0.8 * fragColor + pow(light * fragColor, vec3(1.3)), 1.0);
+  if (fragVertColor.x < 1.0f)
+    outColor = vec4(0.0f);
+  else {
+    vec3 _color = vec3(srgb_to_rgb(fragColor.xyz) * fragVertColor);
+    //outColor = vec4(_color, fragColor.w);
+    outColor = vec4(pow(light * _color, vec3(1.5)), fragColor.w);
+  }
+  //
   /*outColor = texture(texSampler, vec2(-0.5, -0.5) + (fragTexCoord * 0.5));*/
 }

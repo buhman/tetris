@@ -19,6 +19,7 @@
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_FORCE_LEFT_HANDED
+#define GLM_FORCE_SWIZZLE
 #include <glm/glm.hpp>
 #include <glm/ext/matrix_projection.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -98,7 +99,7 @@ struct vertex {
 struct _ubo {
   alignas(16) glm::mat4 model;
   alignas(16) glm::mat4 view;
-  alignas(16) glm::vec3 color;
+  alignas(16) glm::vec4 color;
 };
 
 static size_t uniformDynamicAlignment;
@@ -116,42 +117,56 @@ static void * uboModels;
 
 // clockwise
 const std::vector<vertex> vertices = {
-  {{ 0.0f, 0.0f, 0.7f}, {0.5f, 0.5f, 0.5f}, {-1.0f, -1.0f}},
-  {{ 0.0f, 1.0f, 0.7f}, {0.5f, 0.5f, 0.5f}, { 1.0f, -1.0f}},
-  {{ 1.0f, 1.0f, 0.7f}, {0.5f, 0.5f, 0.5f}, { 1.0f,  1.0f}},
-  {{ 1.0f, 0.0f, 0.7f}, {0.5f, 0.5f, 0.5f}, {-1.0f,  1.0f}},
+  {{ 0.05f, 0.05f, 0.0f}, {1.0f, 1.0f, 1.0f}, {-1.0f, -1.0f}},
+  {{ 0.05f, 0.95f, 0.0f}, {1.0f, 1.0f, 1.0f}, { 1.0f, -1.0f}},
+  {{ 0.95f, 0.95f, 0.0f}, {1.0f, 1.0f, 1.0f}, { 1.0f,  1.0f}},
+  {{ 0.95f, 0.05f, 0.0f}, {1.0f, 1.0f, 1.0f}, {-1.0f,  1.0f}},
 
-  {{ 0.3f, 0.3f, 0.4f}, {1.0f, 1.0f, 1.0f}, {-1.0f, -1.0f}},
-  {{ 0.3f, 0.7f, 0.4f}, {1.0f, 1.0f, 1.0f}, { 1.0f, -1.0f}},
-  {{ 0.7f, 0.7f, 0.4f}, {1.0f, 1.0f, 1.0f}, { 1.0f,  1.0f}},
-  {{ 0.7f, 0.3f, 0.4f}, {1.0f, 1.0f, 1.0f}, {-1.0f,  1.0f}},
+  {{ 0.05f, 0.05f, 0.95f}, {1.0f, 1.0f, 1.0f}, {-1.0f, -1.0f}},
+  {{ 0.05f, 0.95f, 0.95f}, {1.0f, 1.0f, 1.0f}, { 1.0f, -1.0f}},
+  {{ 0.95f, 0.95f, 0.95f}, {1.0f, 1.0f, 1.0f}, { 1.0f,  1.0f}},
+  {{ 0.95f, 0.05f, 0.95f}, {1.0f, 1.0f, 1.0f}, {-1.0f,  1.0f}},
+
+  {{  0.0f,  0.0f, 0.0f}, {1.0f, 1.0f, 1.0f}, {-1.0f, -1.0f}},
+  {{  0.0f,  1.0f, 0.0f}, {1.0f, 1.0f, 1.0f}, { 1.0f, -1.0f}},
+  {{  1.0f,  1.0f, 0.0f}, {1.0f, 1.0f, 1.0f}, { 1.0f,  1.0f}},
+  {{  1.0f,  0.0f, 0.0f}, {1.0f, 1.0f, 1.0f}, {-1.0f,  1.0f}},
 };
 
 /*
-   0      1
-     4  5
-     7  6
-   3      2
+
+  yell = 0
+  blue = 1
+  red  = 2
+  cyan = 3
+
+  magen = 4
+  green = 5
+  white = 6
+  black = 7
  */
 
 
 const std::vector<uint16_t> indices = {
-  0, 1, 2, 3, 0,
+  8, 9, 10, 11, 8,
 
-  4, 5, 6,
-  6, 7, 4,
+  0, 1, 2,
+  2, 3, 0,
 
-  0, 1, 4,
-  4, 1, 5,
+  3, 2, 6,
+  6, 7, 3,
 
-  1, 2, 6,
-  6, 5, 1,
+  7, 6, 5,
+  5, 4, 7,
 
-  2, 3, 6,
-  6, 3, 7,
+  4, 5, 1,
+  1, 0, 4,
 
-  3, 0, 7,
-  7, 0, 4,
+  1, 5, 6,
+  6, 2, 1,
+
+  4, 0, 3,
+  3, 7, 4,
 };
 
 struct mvp_t {
@@ -195,7 +210,7 @@ void initWindow() {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-  window = glfwCreateWindow(800, 800, "tak tetris", nullptr, nullptr);
+  window = glfwCreateWindow(1080, 1080, "tak tetris", nullptr, nullptr);
 }
 
 bool assertValidationLayers() {
@@ -591,7 +606,7 @@ void createRenderPass() {
   subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
   subpass.colorAttachmentCount = 1;
   subpass.pColorAttachments = &colorAttachmentRef;
-  //subpass.pDepthStencilAttachment = &depthAttachmentRef;
+  subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
   VkSubpassDependency dependency{};
   dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -734,9 +749,9 @@ void createGraphicsPipelines() {
 
   VkPipelineColorBlendAttachmentState colorBlendAttachment{};
   colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-  colorBlendAttachment.blendEnable = VK_FALSE;
-  colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-  colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+  colorBlendAttachment.blendEnable = VK_TRUE;
+  colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+  colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
   colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
   colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
   colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
@@ -1148,11 +1163,12 @@ void createCommandBuffers() {
                               pipelineLayout, 0, 1,
                               &descriptorSets[i], 1, &dynamicOffset);
 
-      vkCmdDrawIndexed(commandBuffers[i], 30, 1, 5, 0, 0);
+      vkCmdDrawIndexed(commandBuffers[i], 36, 1, 5, 0, 0);
     }
 
     //
 
+    /*
     vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline[1]);
     for (uint32_t j = 0; j < 5; j++) {
       dynamicOffset = (j + uniformSquareInstances) * static_cast<uint32_t>(uniformDynamicAlignment);
@@ -1163,6 +1179,7 @@ void createCommandBuffers() {
 
       vkCmdDrawIndexed(commandBuffers[i], 5, 1, 0, 0, 0);
     }
+    */
 
     //
 
@@ -1461,7 +1478,7 @@ int getCellIndex(int u, int v, int frameIndex) {
   return (v * tetris::columns + u) + (frameIndex * tetris::rows * tetris::columns);
 }
 
-void updateUniformBuffer(uint32_t currentImage) {
+void updateUniformBuffer(uint32_t currentImage, float time) {
   /*
     views
   */
@@ -1512,7 +1529,7 @@ void updateUniformBuffer(uint32_t currentImage) {
 
   glm::mat4 _ndc;
   _ndc = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 1.0f, 0.0f));
-  _ndc = glm::scale(_ndc, glm::vec3(0.05f, -0.05f, 0.0f));
+  _ndc = glm::scale(_ndc, glm::vec3(0.05f, -0.05f, 0.05f));
 
   glm::mat4 _frame[2];
   _frame[0] = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 10.0f, 0.0f));
@@ -1523,11 +1540,11 @@ void updateUniformBuffer(uint32_t currentImage) {
 
   glm::mat4 _queue;  // frame-relative
   _queue = glm::translate(glm::mat4(1.0f), glm::vec3(16.0f, 19.0f, 0.0f));
-  _queue = glm::scale(_queue, glm::vec3(0.75f, 0.75f, 0.0f));
+  _queue = glm::scale(_queue, glm::vec3(0.75f, 0.75f, 0.75f));
 
   glm::mat4 _swap;  // frame-relative
   _swap = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 19.0f, 0.0f));
-  _swap = glm::scale(_swap, glm::vec3(0.75f, 0.75f, 0.0f));
+  _swap = glm::scale(_swap, glm::vec3(0.75f, 0.75f, 0.75f));
 
 
   /*
@@ -1558,7 +1575,7 @@ void updateUniformBuffer(uint32_t currentImage) {
       const int ghostCellIndex = getCellIndex(frame.piece.pos.u + off.u, frame.piece.drop_row + off.v, frameIndex);
       assert(ghostCellIndex >= 0);
       _cell = (_ubo*)(((uint64_t)uboModels + (ghostCellIndex * uniformDynamicAlignment)));
-      _cell->color = 0.1f * cellColors[(int)frame.piece.tet];
+      _cell->color = glm::vec4(cellColors[(int)frame.piece.tet].xyz(), 0.1f);
 
       const int pieceCellIndex = getCellIndex(frame.piece.pos.u + off.u, frame.piece.pos.v + off.v, frameIndex);
       assert(pieceCellIndex >= 0);
@@ -1594,8 +1611,8 @@ void updateUniformBuffer(uint32_t currentImage) {
   _ubo* red = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
   red->model = glm::scale(glm::mat4(1.0f), glm::vec3(40.0f, 40.0f, 0.0f));
   red->view = _ndc;
-  //red->color = glm::vec3(1.0f, 0.0f, 0.0f);
-  red->color = glm::vec3(0.1f, 0.1f, 0.1f);
+  //red->color = glm::vec4(1.0f, 0.0f, 0.0f);
+  red->color = glm::vec4(0.1f, 0.1f, 0.1f, 0.0f);
 
 
   for (int i = 0; i < 2; i++) {
@@ -1605,19 +1622,19 @@ void updateUniformBuffer(uint32_t currentImage) {
     _ubo* green = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
     green->model = glm::scale(glm::mat4(1.0f), glm::vec3(20.0f, 20.0f, 0.0f));
     green->view = _ndc * _frame[i];
-    //green->color = glm::vec3(0.0f, 1.0f, 0.0f);
-    red->color = glm::vec3(0.1f, 0.1f, 0.1f);
+    //green->color = glm::vec4(0.0f, 1.0f, 0.0f);
+    green->color = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f);
 
     _ubo* cyan = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
     cyan->model = glm::scale(glm::mat4(1.0f), glm::vec3(10.0f, 20.0f, 0.0f));
     cyan->view = _ndc * _frame[i] * _field;
-    cyan->color = glm::vec3(0.0f, 1.0f, 1.0f);
+    cyan->color = glm::vec4(0.0f, 1.0f, 1.0f, 1.0f);
 
     /*
     _ubo* magenta = (_ubo*)(((uint64_t)uboModels + ((2 + off) * uniformDynamicAlignment)));
     magenta->model = glm::mat4(1.0f);
     magenta->view = _ndc * _frame[i] * _play;
-    magenta->color = glm::vec3(1.0f, 0.0f, 1.0f);
+    magenta->color = glm::vec4(1.0f, 0.0f, 1.0f);
     */
   }
 
@@ -1632,7 +1649,7 @@ void updateUniformBuffer(uint32_t currentImage) {
 
   //
 
-  glm::mat4 view = glm::mat4(1.0f);
+  glm::mat4 view = glm::ortho( -1.f, 1.f, -1.f, 1.f, -2.f, 2.f );
   float ratio = ((float)swapChainExtent.height / (float)swapChainExtent.width);
   if (ratio < 0.5) {
     view[0][0] = (ratio * 2);
@@ -1640,12 +1657,15 @@ void updateUniformBuffer(uint32_t currentImage) {
   } else
     view[1][1] = 1.0f / ratio;
 
+  view = glm::rotate(view, glm::radians((std::sin(time * 0.1f) + 1.0f) * 45.0f), glm::vec3(1.0f, 1.0f, 1.0f));
+
+
   vkMapMemory(logicalDevice, uniformBuffersMemory[currentImage], 0, uniformBufferSize, 0, &data);
   memcpy(data, &view, uniformBufferSize);
   vkUnmapMemory(logicalDevice, uniformBuffersMemory[currentImage]);
 }
 
-void drawFrame() {
+void drawFrame(float time) {
   vkWaitForFences(logicalDevice, 1, &frameInFlight[currentFrame], VK_TRUE, UINT64_MAX);
 
   uint32_t imageIndex;
@@ -1663,7 +1683,7 @@ void drawFrame() {
     vkWaitForFences(logicalDevice, 1, &imageInFlight[imageIndex], VK_TRUE, UINT64_MAX);
   imageInFlight[imageIndex] = frameInFlight[currentFrame];
 
-  updateUniformBuffer(imageIndex);
+  updateUniformBuffer(imageIndex, time);
 
   VkSubmitInfo submitInfo{};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1708,6 +1728,7 @@ typedef std::chrono::high_resolution_clock clock_;
 void loop() {
   auto fpsTime = clock_::now();
   auto tickTime = clock_::now();
+  auto uuTime = clock_::now();
   int frames = 0;
 
   while (!glfwWindowShouldClose(window)) {
@@ -1715,10 +1736,13 @@ void loop() {
 
     glfwPollEvents();
     input::poll_gamepads();
-    drawFrame();
 
     float time;
     auto currentTime = clock_::now();
+    time = duration(currentTime - uuTime).count();
+    drawFrame(time);
+
+    currentTime = clock_::now();
     time = duration(currentTime - tickTime).count();
     if (time > 0.5f) {
       tickTime = currentTime;
