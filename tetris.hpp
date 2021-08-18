@@ -55,7 +55,7 @@ namespace tetris {
 
   using clock = std::chrono::high_resolution_clock;
   using time_point = std::chrono::time_point<std::chrono::high_resolution_clock>;
-  using duration = std::chrono::duration<float, std::chrono::milliseconds::period>;
+  using duration = std::chrono::duration<float, std::chrono::seconds::period>;
 
   struct piece {
     tetris::tet tet;
@@ -84,6 +84,8 @@ namespace tetris {
     tetris::piece piece;
     tetris::tet swap;
     bool swapped;
+    int level;
+    time_point point;
   };
 
   constexpr int frame_count = 2;
@@ -99,5 +101,6 @@ namespace tetris {
   void next_piece();
   bool lock_delay(tetris::piece& piece);
   bool move(tetris::coord offset, int rotation);
+  bool gravity(tetris::frame& frame);
   void init();
 }

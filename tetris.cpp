@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cassert>
 #include <chrono>
+#include <cmath>
 #include <iostream>
 #include <queue>
 #include <random>
@@ -158,9 +159,7 @@ void tetris::event_reset_frame(tetris::side_t side)
   _next_piece(frame.piece, next_tet(frame));
   update_drop_row(frame.piece);
   frame.swap = tetris::tet::empty;
-  // bag
-  // queue
-  // swap
+  frame.level = 1;
 }
 
 
@@ -249,7 +248,7 @@ bool tetris::lock_delay(tetris::piece& piece)
 
   float duration = tetris::duration(now - point).count();
 
-  if (moves < 15 && duration < 500.0f) {
+  if (moves < 15 && duration < 0.5f) {
     moves++;
     return true;
   } else {
@@ -285,6 +284,26 @@ bool tetris::move(tetris::coord offset, int rotation)
   }
 }
 
+static inline float _gravity(int level)
+{
+  return std::pow((0.8 - ((level - 1) * 0.007)), (level - 1));
+}
+
+bool tetris::gravity(tetris::frame& frame)
+{
+  auto& point = frame.point;
+  auto now = tetris::clock::now();
+
+  float duration = tetris::duration(now - point).count();
+
+  if (_gravity(frame.level) < duration) {
+    frame.point = tetris::clock::now();
+    return true;
+  } else {
+    return false;
+  }
+}
+
 void tetris::init()
 {
   for (int i = 0; i < tetris::frame_count; i++) {
@@ -292,5 +311,6 @@ void tetris::init()
     tetris::frames[i].bag.clear();
     tetris::frames[i].piece.tet = tetris::tet::empty;
     tetris::frames[i].swap = tetris::tet::empty;
+    tetris::frames[i].point = tetris::clock::now();
   }
 }

@@ -237,6 +237,9 @@ void client::tick()
   if (tetris::this_side == tetris::side_t::none)
     return;
 
+  if (!tetris::gravity(THIS_FRAME))
+    return;
+
   if (tetris::move({0, -1}, 0)) {
     THIS_FRAME.piece.lock_delay.locking = false;
     event_move(THIS_FRAME.piece, tetris::this_side);

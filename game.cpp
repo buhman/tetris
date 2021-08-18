@@ -1477,7 +1477,7 @@ int getCellIndex(int u, int v, int frameIndex) {
   return (v * tetris::columns + u) + (frameIndex * tetris::rows * tetris::columns);
 }
 
-void updateUniformBuffer(uint32_t currentImage, float time) {
+void updateUniformBuffer(uint32_t currentImage) {
   /*
     views
   */
@@ -1639,7 +1639,7 @@ void updateUniformBuffer(uint32_t currentImage, float time) {
   vkUnmapMemory(logicalDevice, uniformBuffersMemory[currentImage]);
 }
 
-void drawFrame(float time) {
+void drawFrame() {
   vkWaitForFences(logicalDevice, 1, &frameInFlight[currentFrame], VK_TRUE, UINT64_MAX);
 
   uint32_t imageIndex;
@@ -1657,7 +1657,7 @@ void drawFrame(float time) {
     vkWaitForFences(logicalDevice, 1, &imageInFlight[imageIndex], VK_TRUE, UINT64_MAX);
   imageInFlight[imageIndex] = frameInFlight[currentFrame];
 
-  updateUniformBuffer(imageIndex, time);
+  updateUniformBuffer(imageIndex);
 
   VkSubmitInfo submitInfo{};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1701,8 +1701,6 @@ typedef std::chrono::high_resolution_clock clock_;
 
 void loop() {
   auto fpsTime = clock_::now();
-  auto tickTime = clock_::now();
-  auto uuTime = clock_::now();
   int frames = 0;
 
   while (!glfwWindowShouldClose(window)) {
@@ -1710,23 +1708,14 @@ void loop() {
 
     glfwPollEvents();
     input::poll_gamepads();
+    client::tick();
+    drawFrame();
 
-    float time;
-    auto currentTime = clock_::now();
-    time = duration(currentTime - uuTime).count();
-    drawFrame(time);
+    // fps counting
 
-    currentTime = clock_::now();
-    time = duration(currentTime - tickTime).count();
-    if (time > 0.5f) {
-      tickTime = currentTime;
-      client::tick();
-    }
-
-    //
     frames += 1;
-    currentTime = clock_::now();
-    time = duration(currentTime - fpsTime).count();
+    auto currentTime = clock_::now();
+    float time = duration(currentTime - fpsTime).count();
     if (time > 1.0f) {
       //std::cerr << "frames: " << frames << '\n';
       fpsTime = currentTime;
@@ -1735,10 +1724,10 @@ void loop() {
 
     auto end = clock_::now();
     auto elapsed = duration(end - start);
-    if (elapsed.count() < 0.016666666666666666f) {
-      //std::cerr << "sleep for " << 0.2f - elapsed.count() << '\n';
+    constexpr float frame_time = (1 / 60.0f);
+    if (elapsed.count() < frame_time) {
       std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::duration<float>(0.016666666666666666f - elapsed.count())
+        std::chrono::duration<float>(frame_time - elapsed.count())
       ));
     }
   }
