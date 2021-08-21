@@ -19,13 +19,13 @@ struct state {
 
 static state state;
 
-constexpr const char* server_addr = "::1";
-constexpr uint16_t server_port = 5000;
+constexpr const char* server_addr = "localhost";
+constexpr const char* server_port = "5000";
 
 int reconnect()
 {
   int ret;
-  int fd;
+  int fd = -1;
 
   if (state.fd >= 0) {
     ret = close(state.fd);
@@ -34,36 +34,62 @@ int reconnect()
     state.fd = -1;
   }
 
-  fd = socket(AF_INET6, SOCK_STREAM, 0);
-  if (fd < 0) {
-    std::cerr << "socket: " << std::strerror(errno) << '\n';
-    throw "socket";
-  }
-
-  struct in6_addr addr;
-  ret = inet_pton(AF_INET6, server_addr, &addr);
-  if (ret != 1)
-    throw "inet_pton";
-
-  struct sockaddr_in6 sa = {
-    .sin6_family = AF_INET6,
-    .sin6_port = bswap::hton(server_port),
-    .sin6_addr = addr
-  };
-
-  ret = connect(fd, (struct sockaddr*)&sa, (sizeof (struct sockaddr_in6)));
-  if (ret < 0) {
-    std::cerr << "connect: " << std::strerror(errno) << '\n';
-    #ifdef _WIN32
-    std::cerr << "WSAGetLastError: " << WSAGetLastError() << '\n';
-    #endif
+  struct addrinfo *result, *rp;
+  struct addrinfo hints{};
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_protocol = IPPROTO_TCP;
+  ret = getaddrinfo(server_addr, server_port, &hints, &result);
+  if (ret != 0) {
+    std::cerr << "getaddrinfo: " << gai_strerror(ret) << '\n';
     return -1;
   }
 
-  std::cerr << "connected " << server_addr << '\n';
+  for (rp = result; rp != NULL; rp = rp->ai_next) {
+    fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+    if (fd < 0) {
+      std::cerr << "socket: " << std::strerror(errno) << '\n';
+      continue;
+    }
 
-  state.fd = fd;
-  return 0;
+    ret = connect(fd, rp->ai_addr, rp->ai_addrlen);
+    if (ret == 0) {
+      break;
+    } else {
+      char saddr[INET6_ADDRSTRLEN];
+      const char * cret;
+      const void * naddr;
+      uint16_t nport;
+      if (rp->ai_family == AF_INET6) {
+        naddr = &((struct sockaddr_in6 *)rp->ai_addr)->sin6_addr;
+        nport = ((struct sockaddr_in6 *)rp->ai_addr)->sin6_port;
+      } else if (rp->ai_family == AF_INET) {
+        naddr = &((struct sockaddr_in *)rp->ai_addr)->sin_addr;
+        nport = ((struct sockaddr_in *)rp->ai_addr)->sin_port;
+      } else
+        throw rp->ai_family;
+
+      cret = inet_ntop(rp->ai_family, naddr, saddr, (sizeof (saddr)));
+      if (cret == nullptr)
+        throw "inet_ntop";
+
+      std::cerr << "connect: " << '[' << saddr << "]:" << bswap::ntoh(nport) << ' ' << std::strerror(errno) << '\n';
+      #ifdef _WIN32
+      std::cerr << "WSAGetLastError: " << WSAGetLastError() << '\n';
+      #endif
+      close(fd);
+      fd = -1;
+    }
+  }
+  freeaddrinfo(result);
+
+  if (fd != -1) {
+    state.fd = fd;
+    std::cerr << "connected\n";
+    return 0;
+  } else {
+    return -1;
+  }
 }
 
 static void send_frame(const message::frame_header_t& header, const message::next_t& next)
