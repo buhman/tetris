@@ -118,9 +118,12 @@ static void reset_field(tetris::field& field)
       fill(field[i][j], i, j);
 }
 
+static int _bag = 0;
+
 static void refill_bag(tetris::bag& bag)
 {
   if (bag.size() == 0) {
+    std::cerr << "bag " << _bag++ << '\n';
     tetris::bag::iterator it = bag.end();
     for (int i = 0; i != (int)tetris::tet::empty; i++) {
       tetris::tet t = static_cast<tetris::tet>(i);
@@ -359,7 +362,7 @@ bool tetris::move(tetris::coord offset, int rotation)
       tetris::coord k_offset_b = kick_offsets(piece.tet)[(int)p.facing][kick];
       int kick_u = k_offset_a.u - k_offset_b.u;
       int kick_v = k_offset_a.v - k_offset_b.v;
-      std::cerr << "kick " << (int)piece.facing << (int)p.facing << " : " << kick_u << ' ' << kick_v << '\n';
+      //std::cerr << "kick " << (int)piece.facing << (int)p.facing << " : " << kick_u << ' ' << kick_v << '\n';
       p.pos.u += kick_u;
       p.pos.v += kick_v;
     }
@@ -446,7 +449,6 @@ void tetris::init()
     tetris::frames[i].queue.clear();
     tetris::frames[i].bag.clear();
     tetris::frames[i].piece.tet = tetris::tet::empty;
-    std::cerr << "dr" << tetris::frames[i].piece.drop_row << '\n';
     tetris::frames[i].swap = tetris::tet::empty;
     tetris::frames[i].point = tetris::clock::now();
   }

@@ -51,7 +51,7 @@ void main() {
   if (fragVertColor.x < 1.0f)
     outColor = vec4(0.0f);
   else {
-    vec3 _color = vec3(srgb_to_rgb(fragColor.xyz) * fragVertColor);
+    vec3 _color = vec3(srgb_to_rgb(fragColor.xyz));
     outColor = vec4(_color, fragColor.w);
     //outColor = vec4(pow(light * _color, vec3(1.5)), fragColor.w);
   }
