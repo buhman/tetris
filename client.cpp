@@ -200,8 +200,8 @@ static void loop()
     case message::type_t::_next_piece:
       assert(header.side != tetris::this_side);
       assert(header.next_length == message::piece::size);
+      tetris::_garbage(tetris::frames[(int)header.side].field, tetris::frames[(int)header.side].garbage);
       message::piece::decode(buf_frame, tetris::frames[(int)header.side].piece);
-      tetris::_garbage(tetris::frames[(int)header.side]);
       break;
     case message::type_t::_move:
       //std::cerr << "message _move " << (int)header.side << '\n';
@@ -216,13 +216,14 @@ static void loop()
       message::piece::decode(buf_frame, tetris::frames[(int)header.side].piece);
       tetris::place(tetris::frames[(int)header.side]);
       break;
-    case message::type_t::_garbage:
+    case message::type_t::_attack:
     {
-      // no header.side assert(?)
-      assert(header.next_length == message::garbage::size);
-      uint8_t lines;
-      message::garbage::decode(buf_frame, lines);
-      tetris::garbage(tetris::frames[(int)header.side], lines);
+      // no header.side assert
+      std::cerr << "recv attack " << (int)header.side << '\n';
+      assert(header.next_length == message::attack::size);
+      tetris::attack_t attack;
+      message::attack::decode(buf_frame, attack);
+      tetris::attack(tetris::frames[(int)header.side], attack);
       break;
     }
     default:
@@ -296,6 +297,7 @@ void client::tick()
     if (!tetris::lock_delay(THIS_FRAME.piece)) {
       tetris::drop();
       event_drop(THIS_FRAME.piece, tetris::this_side);
+      tetris::_garbage(THIS_FRAME.field, THIS_FRAME.garbage);
       tetris::next_piece();
       event_next_piece(THIS_FRAME.piece, tetris::this_side);
     }

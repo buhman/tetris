@@ -75,15 +75,17 @@ namespace piece {
   }
 }
 
-namespace garbage {
-  void decode(const std::uint8_t * buf, std::uint8_t& lines)
+namespace attack {
+  void decode(const std::uint8_t * buf, tetris::attack_t& attack)
   {
-    lines = buf[0];
+    attack.rows = buf[0];
+    attack.column = buf[1];
   }
 
-  void encode(const std::uint8_t lines, std::uint8_t * buf)
+  void encode(const tetris::attack_t& attack, std::uint8_t * buf)
   {
-    buf[0] = lines;
+    buf[0] = attack.rows;
+    buf[1] = attack.column;
   }
 }
 
@@ -105,10 +107,10 @@ size_t encode(const frame_header_t& header, const next_t& next, std::uint8_t * b
     assert(header.next_length == message::piece::size);
     message::piece::encode(std::get<tetris::piece>(next), buf);
     return message::frame_header::size + message::piece::size;
-  case message::type_t::_garbage:
-    assert(header.next_length == message::garbage::size);
-    message::garbage::encode(std::get<uint8_t>(next), buf);
-    return message::frame_header::size + message::garbage::size;
+  case message::type_t::_attack:
+    assert(header.next_length == message::attack::size);
+    message::attack::encode(std::get<tetris::attack_t>(next), buf);
+    return message::frame_header::size + message::attack::size;
   default:
     std::cerr << header.type << '\n';
     assert(false);

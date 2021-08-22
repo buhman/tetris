@@ -11,10 +11,10 @@ namespace message {
     _next_piece,
     _move,
     _drop,
-    _garbage,
+    _attack,
   };
 
-  using next_t = std::variant<std::monostate, tetris::field, tetris::piece, std::uint8_t>;
+  using next_t = std::variant<std::monostate, tetris::field, tetris::piece, std::uint8_t, tetris::attack_t>;
 
   // frame_header
 
@@ -54,13 +54,14 @@ namespace message {
                             + (sizeof (int8_t));    // drop_row
   }
 
-  // garbage
+  // attack
 
-  namespace garbage {
-    void decode(const std::uint8_t * buf, std::uint8_t& lines);
-    void encode(const std::uint8_t lines, std::uint8_t * buf);
+  namespace attack {
+    void decode(const std::uint8_t * buf, tetris::attack_t& attack);
+    void encode(const tetris::attack_t& attack, std::uint8_t * buf);
 
-    constexpr uint16_t size = (sizeof (uint8_t));    // lines
+    constexpr uint16_t size = (sizeof (uint8_t))   // rows
+                            + (sizeof (uint8_t));  // column
   }
 
   //

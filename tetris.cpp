@@ -270,8 +270,7 @@ void tetris::next_piece()
   assert(tetris::this_side != tetris::side_t::none);
 
   _next_piece(THIS_FRAME.piece, next_tet(THIS_FRAME));
-  std::cerr << (int)tetris::this_side << ' ' << THIS_FRAME.garbage << '\n';
-  _garbage(THIS_FRAME);
+
   update_drop_row(THIS_FRAME.piece);
 }
 
@@ -345,38 +344,40 @@ bool tetris::gravity(tetris::frame& frame)
   }
 }
 
-void tetris::_garbage(tetris::frame& frame)
+void __garbage(tetris::field& field, tetris::attack_t& attack)
 {
-  tetris::field& field = frame.field;
-  int lines = frame.garbage;
-  assert(lines >= 0);
-  if (lines == 0)
-    return;
+  assert(attack.rows > 0);
 
   std::cerr << "_garbage processing\n";
 
   for (int row = tetris::rows - 1; row >= 0; row--) {
     for (int col = 0; col < tetris::columns; col++) {
-      if (row >= tetris::rows - lines) {
-        //assert(field[col][row].color == tetris::tet::empty);
-      } else if (lines > row) {
-        field[col][row].color = tetris::tet::last;
+      if (row < attack.rows) {
+        if (col == attack.column)
+          field[col][row].color = tetris::tet::empty;
+        else
+          field[col][row].color = tetris::tet::last;
       } else {
-        std::cerr << row << '\n';
-        assert(row - lines >= 0);
-        field[col][row].color = field[col][row - lines].color;
+        assert(row - attack.rows >= 0);
+        field[col][row].color = field[col][row - attack.rows].color;
       }
     }
   }
-  frame.garbage = 0;
 }
 
-void tetris::garbage(tetris::frame& frame, int lines)
+void tetris::_garbage(tetris::field& field, tetris::garbage_t& garbage)
 {
-  std::cerr << "received garbage " << (void*)&frame << ' ' << lines << '\n';
-  frame.garbage += lines;
-  if (frame.garbage > 20)
-    frame.garbage = 20;
+  for (auto& attack : garbage.attacks)
+    __garbage(field, attack);
+  garbage.attacks.clear();
+  garbage.total = 0;
+}
+
+void tetris::attack(tetris::frame& frame, tetris::attack_t& attack)
+{
+  std::cerr << "received attack " << (void*)&frame << ' ' << attack.rows << '\n';
+  frame.garbage.total += attack.rows;
+  frame.garbage.attacks.push_back(attack);
 }
 
 void tetris::init()

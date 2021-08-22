@@ -4,6 +4,7 @@
 #include <array>
 #include <unordered_set>
 #include <chrono>
+#include <deque>
 
 namespace tetris {
   enum class tet {
@@ -77,6 +78,16 @@ namespace tetris {
   typedef std::unordered_set<tetris::tet> bag;
   typedef std::vector<tetris::tet> queue;
 
+  struct attack_t {
+    int rows;
+    int column;
+  };
+
+  struct garbage_t {
+    int total;
+    std::deque<attack_t> attacks;
+  };
+
   struct frame {
     tetris::field field;
     tetris::bag bag;
@@ -87,7 +98,7 @@ namespace tetris {
     int points;
     int level;
     time_point point;
-    int garbage;
+    garbage_t garbage;
   };
 
   constexpr int frame_count = 2;
@@ -104,7 +115,7 @@ namespace tetris {
   bool lock_delay(tetris::piece& piece);
   bool move(tetris::coord offset, int rotation);
   bool gravity(tetris::frame& frame);
-  void _garbage(tetris::frame& frame);
-  void garbage(tetris::frame& frame, int lines);
+  void _garbage(tetris::field& field, tetris::garbage_t& garbage);
+  void attack(tetris::frame& frame, tetris::attack_t& attack);
   void init();
 }
