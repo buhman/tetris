@@ -15,50 +15,91 @@
 tetris::side_t tetris::this_side = tetris::side_t::none;
 std::array<tetris::frame, tetris::frame_count> tetris::frames;
 
-tetris::coord tetris::offsets[(int)tetris::tet::last][4][4] = {
+const tetris::coord tetris::offsets[(int)tetris::tet::last][4][4] = {
   [(int)tetris::tet::z] = {
-    {{3, 3}, {4, 3}, {4, 2}, {5, 2}},
-    {{5, 3}, {4, 2}, {5, 2}, {4, 1}},
-    {{3, 2}, {4, 2}, {4, 1}, {5, 1}},
-    {{4, 3}, {3, 2}, {4, 2}, {3, 1}},
+    {{ 0, 0}, { 1, 0}, { 0, 1}, {-1, 1}},
+    {{ 0, 0}, { 0,-1}, { 1, 0}, { 1, 1}},
+    {{ 0, 0}, { 0,-1}, { 1,-1}, {-1, 0}},
+    {{ 0, 0}, {-1, 0}, {-1,-1}, { 0, 1}},
   },
   [(int)tetris::tet::l] = {
-    {{5, 3}, {3, 2}, {4, 2}, {5, 2}},
-    {{4, 3}, {4, 2}, {4, 1}, {5, 1}},
-    {{3, 2}, {4, 2}, {5, 2}, {3, 1}},
-    {{3, 3}, {4, 3}, {4, 2}, {4, 1}},
+    {{ 0, 0}, {-1, 0}, { 1, 0}, { 1, 1}},
+    {{ 0, 0}, { 0,-1}, { 1,-1}, { 0, 1}},
+    {{ 0, 0}, {-1, 0}, { 1, 0}, {-1,-1}},
+    {{ 0, 0}, { 0,-1}, { 0, 1}, {-1, 1}},
   },
   [(int)tetris::tet::o] = {
-    {{4, 3}, {5, 3}, {4, 2}, {5, 2}},
-    {{4, 3}, {5, 3}, {4, 2}, {5, 2}},
-    {{4, 3}, {5, 3}, {4, 2}, {5, 2}},
-    {{4, 3}, {5, 3}, {4, 2}, {5, 2}},
+    {{ 0, 0}, { 0, 1}, { 1, 0}, { 1, 1}},
+    {{ 0, 0}, { 0,-1}, { 1, 0}, { 1,-1}},
+    {{ 0, 0}, { 0,-1}, {-1, 0}, {-1,-1}},
+    {{ 0, 0}, { 0, 1}, {-1, 0}, {-1, 1}},
   },
   [(int)tetris::tet::s] = {
-    {{4, 3}, {5, 3}, {3, 2}, {4, 2}},
-    {{4, 3}, {4, 2}, {5, 2}, {5, 1}},
-    {{4, 2}, {5, 2}, {3, 1}, {4, 1}},
-    {{3, 3}, {3, 2}, {4, 2}, {4, 1}},
+    {{ 0, 0}, {-1, 0}, { 0, 1}, { 1, 1}},
+    {{ 0, 0}, { 0, 1}, { 1, 0}, { 1,-1}},
+    {{ 0, 0}, { 1, 0}, { 0,-1}, {-1,-1}},
+    {{ 0, 0}, { 0,-1}, {-1, 0}, {-1, 1}},
   },
   [(int)tetris::tet::i] = {
-    {{3, 2}, {4, 2}, {5, 2}, {6, 2}},
-    {{5, 3}, {5, 2}, {5, 1}, {5, 0}},
-    {{3, 1}, {4, 1}, {5, 1}, {6, 1}},
-    {{4, 3}, {4, 2}, {4, 1}, {4, 0}},
+    {{ 0, 0}, {-1, 0}, { 1, 0}, { 2, 0}},
+    {{ 0, 0}, { 0, 1}, { 0,-1}, { 0,-2}},
+    {{ 0, 0}, { 1, 0}, {-1, 0}, {-2, 0}},
+    {{ 0, 0}, { 0,-1}, { 0, 1}, { 0, 2}},
   },
   [(int)tetris::tet::j] = {
-    {{3, 3}, {3, 2}, {4, 2}, {5, 2}},
-    {{4, 3}, {5, 3}, {4, 2}, {4, 1}},
-    {{3, 2}, {4, 2}, {5, 2}, {5, 1}},
-    {{4, 3}, {4, 2}, {3, 1}, {4, 1}},
+    {{ 0, 0}, { 1, 0}, {-1, 0}, {-1, 1}},
+    {{ 0, 0}, { 0,-1}, { 0, 1}, { 1, 1}},
+    {{ 0, 0}, {-1, 0}, { 1, 0}, { 1,-1}},
+    {{ 0, 0}, { 0, 1}, { 0,-1}, {-1,-1}},
   },
   [(int)tetris::tet::t] = {
-    {{4, 3}, {3, 2}, {4, 2}, {5, 2}},
-    {{4, 3}, {4, 2}, {5, 2}, {4, 1}},
-    {{3, 2}, {4, 2}, {5, 2}, {4, 1}},
-    {{4, 3}, {3, 2}, {4, 2}, {4, 1}},
+    {{ 0, 0}, {-1, 0}, { 1, 0}, { 0, 1}},
+    {{ 0, 0}, { 0, 1}, { 1, 0}, { 0,-1}},
+    {{ 0, 0}, { 1, 0}, { 0,-1}, {-1, 0}},
+    {{ 0, 0}, {-1, 0}, { 0,-1}, { 0, 1}},
   },
 };
+
+using kick_table_t = std::array<std::array<tetris::coord, tetris::kicks>, (int)tetris::dir::last>;
+
+static const kick_table_t zlsjt_kick = {{
+  {{{ 0, 0}, { 0, 0}, { 0, 0}, { 0, 0}, { 0, 0}}}, // up
+  {{{ 0, 0}, { 1, 0}, { 1,-1}, { 0, 2}, { 1, 2}}}, // right
+  {{{ 0, 0}, { 0, 0}, { 0, 0}, { 0, 0}, { 0, 0}}}, // down
+  {{{ 0, 0}, {-1, 0}, {-1,-1}, { 0, 2}, {-1, 2}}}, // left
+}};
+
+static const kick_table_t i_kick = {{
+  {{{ 0, 0}, {-1, 0}, { 2, 0}, {-1, 0}, { 2, 0}}},
+  {{{-1, 0}, { 0, 0}, { 0, 0}, { 0, 1}, { 0,-2}}},
+  {{{-1, 1}, { 1, 1}, {-2, 1}, { 1, 0}, {-2, 0}}},
+  {{{ 0, 1}, { 0, 1}, { 0, 1}, { 0,-1}, { 0, 2}}},
+}};
+
+static const kick_table_t o_kick = {{
+  {{{ 0, 0}, { 0, 0}, { 0, 0}, { 0, 0}, { 0, 0}}},
+  {{{ 0,-1}, { 0,-1}, { 0,-1}, { 0,-1}, { 0,-1}}},
+  {{{-1,-1}, {-1,-1}, {-1,-1}, {-1,-1}, {-1,-1}}},
+  {{{-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}}},
+}};
+
+static const kick_table_t& kick_offsets(tetris::tet t)
+{
+  switch (t) {
+  case tetris::tet::z:
+  case tetris::tet::l:
+  case tetris::tet::s:
+  case tetris::tet::j:
+  case tetris::tet::t:
+    return zlsjt_kick;
+  case tetris::tet::i:
+    return i_kick;
+  case tetris::tet::o:
+    return o_kick;
+  default:
+    assert(false);
+  }
+}
 
 static auto seed = std::chrono::system_clock::now().time_since_epoch().count();
 static std::default_random_engine generator (seed);
@@ -109,8 +150,9 @@ static bool collision(tetris::piece& p)
 {
   assert(tetris::this_side != tetris::side_t::none);
 
+  const tetris::coord * offset = tetris::offsets[(int)p.tet][(int)p.facing];
+
   for (int i = 0; i < 4; i++) {
-    tetris::coord *offset = tetris::offsets[(int)p.tet][(int)p.facing];
     int q = p.pos.u + offset[i].u;
     int r = p.pos.v + offset[i].v;
 
@@ -132,8 +174,8 @@ static void update_drop_row(tetris::piece& piece) {
 static void _next_piece(tetris::piece& p, tetris::tet t)
 {
   p.tet = t;
-  p.pos.u = 0;
-  p.pos.v = 18;
+  p.pos.u = 4;
+  p.pos.v = 20;
   p.facing = tetris::dir::up;
   p.lock_delay.moves = 0;
   p.lock_delay.locking = false;
@@ -171,7 +213,7 @@ static int clear_lines(tetris::field& field, tetris::piece& piece)
   int cleared = 0;
 
   for (int i = 0; i < 4; i++) {
-    tetris::coord *offset = tetris::offsets[(int)piece.tet][(int)piece.facing];
+    const tetris::coord * offset = tetris::offsets[(int)piece.tet][(int)piece.facing];
     int r = piece.pos.v + offset[i].v;
     if ((1L << r) & seen)
       continue;
@@ -233,7 +275,7 @@ namespace points {
 static int _place(tetris::field& field, tetris::piece& piece)
 {
   for (int i = 0; i < 4; i++) {
-    tetris::coord *offset = tetris::offsets[(int)piece.tet][(int)piece.facing];
+    const tetris::coord * offset = tetris::offsets[(int)piece.tet][(int)piece.facing];
     int q = piece.pos.u + offset[i].u;
     int r = piece.pos.v + offset[i].v;
 
@@ -303,25 +345,43 @@ bool tetris::move(tetris::coord offset, int rotation)
 
   tetris::piece& piece = THIS_FRAME.piece;
   tetris::piece p = piece;
-  p.pos.u += offset.u;
-  p.pos.v += offset.v;
-  p.facing = static_cast<tetris::dir>(((unsigned int)piece.facing + rotation) % (unsigned int)tetris::dir::last);
-  if (collision(p)) {
-    return false;
-  } else {
-    piece.pos.u = p.pos.u;
-    piece.pos.v = p.pos.v;
-    piece.facing = p.facing;
-    if (offset.u || rotation)
-      update_drop_row(piece);
+  p.facing = (tetris::dir)(((unsigned int)piece.facing + rotation) % (unsigned int)tetris::dir::last);
 
-    if (piece.lock_delay.locking) {
-      piece.lock_delay.moves += 1;
-      piece.lock_delay.point = tetris::clock::now();
+  assert(rotation == 1 || rotation == -1 || rotation == 0);
+  p.pos.u = piece.pos.u + offset.u;
+  p.pos.v = piece.pos.v + offset.v;
+
+  for (int kick = 0; kick < tetris::kicks; kick++) {
+    p.pos.u = piece.pos.u + offset.u;
+    p.pos.v = piece.pos.v + offset.v;
+    if (rotation != 0) {
+      tetris::coord k_offset_a = kick_offsets(piece.tet)[(int)piece.facing][kick];
+      tetris::coord k_offset_b = kick_offsets(piece.tet)[(int)p.facing][kick];
+      int kick_u = k_offset_a.u - k_offset_b.u;
+      int kick_v = k_offset_a.v - k_offset_b.v;
+      std::cerr << "kick " << (int)piece.facing << (int)p.facing << " : " << kick_u << ' ' << kick_v << '\n';
+      p.pos.u += kick_u;
+      p.pos.v += kick_v;
     }
 
-    return true;
+    if (collision(p)) {
+      continue;
+    } else {
+      piece.pos.u = p.pos.u;
+      piece.pos.v = p.pos.v;
+      piece.facing = p.facing;
+      if (offset.u || rotation)
+        update_drop_row(piece);
+
+      if (piece.lock_delay.locking) {
+        piece.lock_delay.moves += 1;
+        piece.lock_delay.point = tetris::clock::now();
+      }
+
+      return true;
+    }
   }
+  return false;
 }
 
 static inline float _gravity(int level)

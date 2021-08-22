@@ -1589,7 +1589,7 @@ void updateUniformBuffer(uint32_t currentImage) {
       for (int ti = 0; ti < 4; ti++) {
         tetris::coord off = tetris::offsets[(int)qtet][(int)tetris::dir::up][ti];
         _ubo* queue = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
-        queue->model = glm::translate(glm::mat4(1.0f), glm::vec3(off.u - 3.0f, ((float)qi + 1) * -3.0f + off.v, 0.0f));
+        queue->model = glm::translate(glm::mat4(1.0f), glm::vec3(off.u + 1, ((float)qi) * -3.0f + off.v - 2.0f, 0.0f));
         queue->view = _ndc * _frame[frameIndex] * _queue;
         queue->color = cellColors[(int)qtet];
       }
@@ -1598,7 +1598,7 @@ void updateUniformBuffer(uint32_t currentImage) {
     for (int ti = 0; ti < 4; ti++) {
       tetris::coord off = tetris::offsets[(int)frame.swap][(int)tetris::dir::up][ti];
       _ubo* swap = (_ubo*)(((uint64_t)uboModels + (uboOffset++ * uniformDynamicAlignment)));
-      swap->model = glm::translate(glm::mat4(1.0f), glm::vec3(off.u - 3.0f, -3.0f + off.v, 0.0f));
+      swap->model = glm::translate(glm::mat4(1.0f), glm::vec3(off.u + 2.0f, off.v - 2.0f, 0.0f));
       swap->view = _ndc * _frame[frameIndex] * _swap;
       swap->color = cellColors[(int)frame.swap];
     }

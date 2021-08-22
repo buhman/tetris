@@ -70,10 +70,11 @@ namespace tetris {
     } lock_delay;
   };
 
-  extern coord offsets[static_cast<int>(tetris::tet::last)][4][4];
+  extern const coord offsets[static_cast<int>(tetris::tet::last)][4][4];
 
   constexpr int rows = 40;
   constexpr int columns = 10;
+  constexpr int kicks = 5;
   typedef std::array<std::array<cell, rows>, columns> field;
   typedef std::unordered_set<tetris::tet> bag;
   typedef std::vector<tetris::tet> queue;

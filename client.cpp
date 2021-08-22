@@ -266,8 +266,8 @@ void client::input(tetris::event ev)
       event_move(THIS_FRAME.piece, tetris::this_side);
     break;
   case tetris::event::spin_180:
-    if (tetris::move({0, 0}, 2))
-      event_move(THIS_FRAME.piece, tetris::this_side);
+    //if (tetris::move({0, 0}, 2))
+    //  event_move(THIS_FRAME.piece, tetris::this_side);
     break;
   case tetris::event::swap:
     if (!THIS_FRAME.swapped) {
